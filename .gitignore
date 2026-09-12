@@ -1,0 +1,30 @@
+# --- Raw / processed data (large, regenerable from the pipelines in
+# pm2.5-data/ and the preprocessing job that produced the clean-data_*
+# files) - keep out of git. Small metadata files that describe the data
+# (feature_manifest.yaml, preprocessing_schema.json,
+# preprocessing_summary.json) are intentionally NOT listed here; they're
+# referenced as documentation throughout FEATURE_SELECTION.md/REFERENCE.md.
+/clean-data_preprocess_all_stations_daily*.csv
+/*.csv
+/*.parquet
+/*.parquet.gz
+
+# Trained model artifacts (checkpoints, scalers) - large, regenerable by
+# running pm25-tft-model/pm25_tft_training.ipynb.
+pm25-tft-model/artifacts/
+*.ckpt
+*.pt
+*.pth
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

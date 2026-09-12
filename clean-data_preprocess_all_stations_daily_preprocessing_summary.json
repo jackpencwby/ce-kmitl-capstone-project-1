@@ -1,0 +1,111 @@
+{
+  "input_rows": 199262,
+  "output_rows": 199262,
+  "stations": 227,
+  "inserted_calendar_rows": 0,
+  "short_gap_values_imputed": 24745,
+  "long_gaps_detected": 489,
+  "segments_created": 716,
+  "rows_with_missing_features": 19241,
+  "rows_with_imputed_features": 3510,
+  "features_created": 257,
+  "preprocessing_version": "1.0.0",
+  "run_timestamp_utc": "2026-09-05T10:06:34.578899+00:00",
+  "input_location": "gs://kmitl-capstone-project-data-bucket/clean-data/clean/all_stations_daily.csv",
+  "output_location": "gs://kmitl-capstone-project-data-bucket/clean-data/preprocess/all_stations_daily.csv",
+  "station_name_filter": null,
+  "configuration": {
+    "input_prefix": "clean-data/clean",
+    "output_prefix": "model-data/preprocessed",
+    "output_format": "parquet",
+    "partition_by": null,
+    "max_short_gap_days": 3,
+    "critical_features": [
+      "pm25",
+      "temperature_avg",
+      "humidity_avg",
+      "pressure_avg",
+      "wind_speed_avg",
+      "rainfall",
+      "hotspot_count"
+    ],
+    "optional_features": [
+      "solar_radiation",
+      "sunshine_duration",
+      "hotspot_bright_ti4_max",
+      "hotspot_bright_ti5_max",
+      "hotspot_frp_mean",
+      "hotspot_frp_max"
+    ],
+    "imputation_features": [
+      "wind_speed_avg",
+      "wind_speed_max",
+      "temperature_avg",
+      "temperature_min",
+      "temperature_max",
+      "pressure_avg",
+      "pressure_min",
+      "pressure_max",
+      "humidity_avg",
+      "humidity_min",
+      "humidity_max"
+    ],
+    "weather_features": [
+      "temperature_avg",
+      "humidity_avg",
+      "pressure_avg",
+      "wind_speed_avg"
+    ],
+    "pm25_lags": [
+      1,
+      2,
+      3,
+      7,
+      14
+    ],
+    "weather_lags": [
+      1,
+      3,
+      7
+    ],
+    "rainfall_lags": [
+      1,
+      3,
+      7
+    ],
+    "hotspot_lags": [
+      1,
+      3,
+      7
+    ],
+    "pm25_rolling_windows": [
+      3,
+      7,
+      14
+    ],
+    "weather_rolling_windows": [
+      3,
+      7
+    ],
+    "rainfall_rolling_windows": [
+      3,
+      7,
+      14
+    ],
+    "hotspot_rolling_windows": [
+      3,
+      7
+    ],
+    "difference_periods": [
+      1,
+      3
+    ],
+    "forecast_horizons": [
+      1,
+      2,
+      3,
+      7
+    ],
+    "wind_convention": null
+  }
+}

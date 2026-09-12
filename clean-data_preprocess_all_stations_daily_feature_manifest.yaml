@@ -1,0 +1,499 @@
+preprocessing_version: 1.0.0
+identifiers:
+- station_id
+- station_name
+- date
+- segment_id
+base_features:
+- pm25
+- temperature_avg
+- humidity_avg
+- pressure_avg
+- wind_speed_avg
+- rainfall
+- hotspot_count
+- sunshine_duration
+- hotspot_bright_ti4_max
+- hotspot_bright_ti5_max
+- hotspot_frp_mean
+- hotspot_frp_max
+- wind_speed_max
+- temperature_min
+- temperature_max
+- humidity_min
+- humidity_max
+- pressure_min
+- pressure_max
+- wind_direction_avg
+- wind_direction_at_max_speed
+- hotspot_frp_sum
+- hotspot_day
+- hotspot_night
+calendar_raw:
+- year
+- year_index
+- month
+- day
+- day_of_week
+- day_of_year
+- week_of_year
+- quarter
+cyclical:
+- dow_sin
+- dow_cos
+- month_sin
+- month_cos
+- doy_sin
+- doy_cos
+- wind_direction_avg_sin
+- wind_direction_avg_cos
+- wind_direction_at_max_speed_sin
+- wind_direction_at_max_speed_cos
+physical_derived:
+- temperature_range
+- humidity_range
+- pressure_range
+- rain_event
+- hotspot_present
+- hotspot_day_ratio
+- hotspot_night_ratio
+log_features:
+- log1p_rainfall
+- log1p_hotspot_count
+- log1p_hotspot_frp_sum
+lag_features:
+- hotspot_count_lag_1
+- hotspot_count_lag_3
+- hotspot_count_lag_7
+- hotspot_frp_sum_lag_1
+- hotspot_frp_sum_lag_3
+- hotspot_frp_sum_lag_7
+- humidity_avg_lag_1
+- humidity_avg_lag_3
+- humidity_avg_lag_7
+- max_required_lag_available
+- pm25_lag_1
+- pm25_lag_14
+- pm25_lag_2
+- pm25_lag_3
+- pm25_lag_7
+- pressure_avg_lag_1
+- pressure_avg_lag_3
+- pressure_avg_lag_7
+- rainfall_lag_1
+- rainfall_lag_3
+- rainfall_lag_7
+- temperature_avg_lag_1
+- temperature_avg_lag_3
+- temperature_avg_lag_7
+- wind_speed_avg_lag_1
+- wind_speed_avg_lag_3
+- wind_speed_avg_lag_7
+rolling_features:
+- hotspot_active_days_7d
+- hotspot_count_roll_sum_3d
+- hotspot_count_roll_sum_7d
+- hotspot_frp_sum_roll_sum_3d
+- hotspot_frp_sum_roll_sum_7d
+- humidity_avg_roll_mean_3d
+- humidity_avg_roll_mean_7d
+- pm25_roll_max_7d
+- pm25_roll_mean_14d
+- pm25_roll_mean_3d
+- pm25_roll_mean_7d
+- pm25_roll_min_7d
+- pm25_roll_std_3d
+- pm25_roll_std_7d
+- pressure_avg_roll_mean_3d
+- pressure_avg_roll_mean_7d
+- rain_days_7d
+- rainfall_roll_sum_14d
+- rainfall_roll_sum_3d
+- rainfall_roll_sum_7d
+- temperature_avg_roll_mean_3d
+- temperature_avg_roll_mean_7d
+- wind_speed_avg_roll_mean_3d
+- wind_speed_avg_roll_mean_7d
+difference_features:
+- hotspot_count_diff_1d
+- humidity_avg_diff_1d
+- pm25_diff_1d
+- pm25_diff_3d
+- pressure_avg_diff_1d
+- temperature_avg_diff_1d
+- wind_speed_avg_diff_1d
+quality_metadata: &id001
+- calendar_row_inserted
+- history_days_available
+- hotspot_bright_ti4_max_structural_missing
+- hotspot_bright_ti5_max_structural_missing
+- hotspot_count_imputed
+- hotspot_count_missing_original
+- hotspot_frp_max_structural_missing
+- hotspot_frp_mean_structural_missing
+- hotspot_min_distance_km_structural_missing
+- humidity_avg_imputed
+- humidity_avg_interpolated
+- humidity_avg_missing_original
+- humidity_avg_reverted_interpolation
+- humidity_max_imputed
+- humidity_max_interpolated
+- humidity_max_missing_original
+- humidity_max_reverted_interpolation
+- humidity_min_imputed
+- humidity_min_interpolated
+- humidity_min_missing_original
+- humidity_min_reverted_interpolation
+- imputed_any
+- imputed_feature_count
+- interpolated_any
+- interpolated_feature_count
+- max_required_lag_available
+- missing_feature_count
+- pm25_imputed
+- pm25_missing
+- pm25_missing_clean
+- pm25_missing_original
+- pressure_avg_imputed
+- pressure_avg_interpolated
+- pressure_avg_missing_original
+- pressure_avg_reverted_interpolation
+- pressure_max_imputed
+- pressure_max_interpolated
+- pressure_max_missing_original
+- pressure_max_reverted_interpolation
+- pressure_min_imputed
+- pressure_min_interpolated
+- pressure_min_missing_original
+- pressure_min_reverted_interpolation
+- qc_any_issue
+- qc_hotspot_bright_ti4_max_invalid
+- qc_hotspot_bright_ti5_max_invalid
+- qc_hotspot_conf_high_invalid
+- qc_hotspot_conf_inconsistent
+- qc_hotspot_conf_low_invalid
+- qc_hotspot_conf_nominal_invalid
+- qc_hotspot_count_invalid
+- qc_hotspot_day_invalid
+- qc_hotspot_daynight_inconsistent
+- qc_hotspot_fire_farming_count_invalid
+- qc_hotspot_fire_wildfire_count_invalid
+- qc_hotspot_firetype_exceeds_total
+- qc_hotspot_frp_max_gt_sum
+- qc_hotspot_frp_max_invalid
+- qc_hotspot_frp_mean_gt_max
+- qc_hotspot_frp_mean_invalid
+- qc_hotspot_frp_sum_invalid
+- qc_hotspot_min_distance_km_invalid
+- qc_hotspot_night_invalid
+- qc_humidity_avg_invalid
+- qc_humidity_max_invalid
+- qc_humidity_min_invalid
+- qc_humidity_order_inconsistent
+- qc_invalid_date
+- qc_pm25_duplicate_inconsistent
+- qc_pm25_invalid
+- qc_pm25_source_rows_invalid
+- qc_pm25_source_without_value
+- qc_pm25_value_without_source
+- qc_pressure_avg_invalid
+- qc_pressure_max_invalid
+- qc_pressure_min_invalid
+- qc_pressure_order_inconsistent
+- qc_rainfall_invalid
+- qc_sentinel_value_found
+- qc_solar_radiation_invalid
+- qc_sunshine_duration_invalid
+- qc_temperature_avg_invalid
+- qc_temperature_max_invalid
+- qc_temperature_min_invalid
+- qc_temperature_order_inconsistent
+- qc_wind_direction_at_max_speed_invalid
+- qc_wind_direction_avg_invalid
+- qc_wind_speed_avg_invalid
+- qc_wind_speed_max_invalid
+- qc_wind_speed_order_inconsistent
+- rainfall_imputed
+- rainfall_missing_original
+- temperature_avg_imputed
+- temperature_avg_interpolated
+- temperature_avg_missing_original
+- temperature_avg_reverted_interpolation
+- temperature_max_imputed
+- temperature_max_interpolated
+- temperature_max_missing_original
+- temperature_max_reverted_interpolation
+- temperature_min_imputed
+- temperature_min_interpolated
+- temperature_min_missing_original
+- temperature_min_reverted_interpolation
+- tft_history_valid
+- wind_speed_avg_imputed
+- wind_speed_avg_interpolated
+- wind_speed_avg_missing_original
+- wind_speed_avg_reverted_interpolation
+- wind_speed_max_imputed
+- wind_speed_max_interpolated
+- wind_speed_max_missing_original
+- wind_speed_max_reverted_interpolation
+- xgboost_history_valid
+target_features: &id002
+- target_pm25_t1
+- target_pm25_t2
+- target_pm25_t3
+- target_pm25_t7
+target_availability:
+- target_pm25_t1_available
+- target_pm25_t2_available
+- target_pm25_t3_available
+- target_pm25_t7_available
+views:
+  XGBOOST_FEATURES:
+  - pm25
+  - temperature_avg
+  - humidity_avg
+  - pressure_avg
+  - wind_speed_avg
+  - rainfall
+  - hotspot_count
+  - sunshine_duration
+  - hotspot_bright_ti4_max
+  - hotspot_bright_ti5_max
+  - hotspot_frp_mean
+  - hotspot_frp_max
+  - wind_speed_max
+  - temperature_min
+  - temperature_max
+  - humidity_min
+  - humidity_max
+  - pressure_min
+  - pressure_max
+  - wind_direction_avg
+  - wind_direction_at_max_speed
+  - hotspot_frp_sum
+  - hotspot_day
+  - hotspot_night
+  - year
+  - year_index
+  - month
+  - day
+  - day_of_week
+  - day_of_year
+  - week_of_year
+  - quarter
+  - dow_sin
+  - dow_cos
+  - month_sin
+  - month_cos
+  - doy_sin
+  - doy_cos
+  - wind_direction_avg_sin
+  - wind_direction_avg_cos
+  - wind_direction_at_max_speed_sin
+  - wind_direction_at_max_speed_cos
+  - temperature_range
+  - humidity_range
+  - pressure_range
+  - rain_event
+  - hotspot_present
+  - hotspot_day_ratio
+  - hotspot_night_ratio
+  - log1p_rainfall
+  - log1p_hotspot_count
+  - log1p_hotspot_frp_sum
+  - hotspot_count_lag_1
+  - hotspot_count_lag_3
+  - hotspot_count_lag_7
+  - hotspot_frp_sum_lag_1
+  - hotspot_frp_sum_lag_3
+  - hotspot_frp_sum_lag_7
+  - humidity_avg_lag_1
+  - humidity_avg_lag_3
+  - humidity_avg_lag_7
+  - max_required_lag_available
+  - pm25_lag_1
+  - pm25_lag_14
+  - pm25_lag_2
+  - pm25_lag_3
+  - pm25_lag_7
+  - pressure_avg_lag_1
+  - pressure_avg_lag_3
+  - pressure_avg_lag_7
+  - rainfall_lag_1
+  - rainfall_lag_3
+  - rainfall_lag_7
+  - temperature_avg_lag_1
+  - temperature_avg_lag_3
+  - temperature_avg_lag_7
+  - wind_speed_avg_lag_1
+  - wind_speed_avg_lag_3
+  - wind_speed_avg_lag_7
+  - hotspot_active_days_7d
+  - hotspot_count_roll_sum_3d
+  - hotspot_count_roll_sum_7d
+  - hotspot_frp_sum_roll_sum_3d
+  - hotspot_frp_sum_roll_sum_7d
+  - humidity_avg_roll_mean_3d
+  - humidity_avg_roll_mean_7d
+  - pm25_roll_max_7d
+  - pm25_roll_mean_14d
+  - pm25_roll_mean_3d
+  - pm25_roll_mean_7d
+  - pm25_roll_min_7d
+  - pm25_roll_std_3d
+  - pm25_roll_std_7d
+  - pressure_avg_roll_mean_3d
+  - pressure_avg_roll_mean_7d
+  - rain_days_7d
+  - rainfall_roll_sum_14d
+  - rainfall_roll_sum_3d
+  - rainfall_roll_sum_7d
+  - temperature_avg_roll_mean_3d
+  - temperature_avg_roll_mean_7d
+  - wind_speed_avg_roll_mean_3d
+  - wind_speed_avg_roll_mean_7d
+  - hotspot_count_diff_1d
+  - humidity_avg_diff_1d
+  - pm25_diff_1d
+  - pm25_diff_3d
+  - pressure_avg_diff_1d
+  - temperature_avg_diff_1d
+  - wind_speed_avg_diff_1d
+  TFT_STATIC_FEATURES:
+  - station_id
+  - station_name
+  TFT_KNOWN_TIME_FEATURES:
+  - year_index
+  - year
+  - month
+  - day
+  - day_of_week
+  - day_of_year
+  - week_of_year
+  - quarter
+  - dow_sin
+  - dow_cos
+  - month_sin
+  - month_cos
+  - doy_sin
+  - doy_cos
+  TFT_OBSERVED_FEATURES:
+  - pm25
+  - temperature_avg
+  - humidity_avg
+  - pressure_avg
+  - wind_speed_avg
+  - rainfall
+  - hotspot_count
+  - sunshine_duration
+  - hotspot_bright_ti4_max
+  - hotspot_bright_ti5_max
+  - hotspot_frp_mean
+  - hotspot_frp_max
+  - wind_speed_max
+  - temperature_min
+  - temperature_max
+  - humidity_min
+  - humidity_max
+  - pressure_min
+  - pressure_max
+  - wind_direction_avg
+  - wind_direction_at_max_speed
+  - wind_direction_avg_sin
+  - wind_direction_avg_cos
+  - wind_direction_at_max_speed_sin
+  - wind_direction_at_max_speed_cos
+  - hotspot_frp_sum
+  - hotspot_day
+  - hotspot_night
+  - temperature_range
+  - humidity_range
+  - pressure_range
+  - rain_event
+  - hotspot_present
+  - hotspot_day_ratio
+  - hotspot_night_ratio
+  - log1p_rainfall
+  - log1p_hotspot_count
+  - log1p_hotspot_frp_sum
+  QUALITY_METADATA: *id001
+  TARGET_FEATURES: *id002
+config:
+  input_prefix: clean-data/clean
+  output_prefix: model-data/preprocessed
+  output_format: parquet
+  partition_by: null
+  max_short_gap_days: 3
+  critical_features:
+  - pm25
+  - temperature_avg
+  - humidity_avg
+  - pressure_avg
+  - wind_speed_avg
+  - rainfall
+  - hotspot_count
+  optional_features:
+  - solar_radiation
+  - sunshine_duration
+  - hotspot_bright_ti4_max
+  - hotspot_bright_ti5_max
+  - hotspot_frp_mean
+  - hotspot_frp_max
+  imputation_features:
+  - wind_speed_avg
+  - wind_speed_max
+  - temperature_avg
+  - temperature_min
+  - temperature_max
+  - pressure_avg
+  - pressure_min
+  - pressure_max
+  - humidity_avg
+  - humidity_min
+  - humidity_max
+  weather_features:
+  - temperature_avg
+  - humidity_avg
+  - pressure_avg
+  - wind_speed_avg
+  pm25_lags:
+  - 1
+  - 2
+  - 3
+  - 7
+  - 14
+  weather_lags:
+  - 1
+  - 3
+  - 7
+  rainfall_lags:
+  - 1
+  - 3
+  - 7
+  hotspot_lags:
+  - 1
+  - 3
+  - 7
+  pm25_rolling_windows:
+  - 3
+  - 7
+  - 14
+  weather_rolling_windows:
+  - 3
+  - 7
+  rainfall_rolling_windows:
+  - 3
+  - 7
+  - 14
+  hotspot_rolling_windows:
+  - 3
+  - 7
+  difference_periods:
+  - 1
+  - 3
+  forecast_horizons:
+  - 1
+  - 2
+  - 3
+  - 7
+  wind_convention: null

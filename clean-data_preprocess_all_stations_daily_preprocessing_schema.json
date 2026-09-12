@@ -1,0 +1,1291 @@
+{
+  "columns": [
+    {
+      "name": "date",
+      "dtype": "datetime64[us]",
+      "null_count": 0
+    },
+    {
+      "name": "station_id",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "station_name",
+      "dtype": "str",
+      "null_count": 0
+    },
+    {
+      "name": "lat",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "long",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "wind_direction_avg",
+      "dtype": "float64",
+      "null_count": 8460
+    },
+    {
+      "name": "wind_direction_at_max_speed",
+      "dtype": "float64",
+      "null_count": 8851
+    },
+    {
+      "name": "wind_speed_avg",
+      "dtype": "float64",
+      "null_count": 6642
+    },
+    {
+      "name": "wind_speed_max",
+      "dtype": "float64",
+      "null_count": 6578
+    },
+    {
+      "name": "temperature_avg",
+      "dtype": "float64",
+      "null_count": 6981
+    },
+    {
+      "name": "temperature_min",
+      "dtype": "float64",
+      "null_count": 6981
+    },
+    {
+      "name": "temperature_max",
+      "dtype": "float64",
+      "null_count": 6996
+    },
+    {
+      "name": "rainfall",
+      "dtype": "float64",
+      "null_count": 8463
+    },
+    {
+      "name": "pressure_avg",
+      "dtype": "float64",
+      "null_count": 6928
+    },
+    {
+      "name": "pressure_min",
+      "dtype": "float64",
+      "null_count": 6990
+    },
+    {
+      "name": "pressure_max",
+      "dtype": "float64",
+      "null_count": 6968
+    },
+    {
+      "name": "humidity_avg",
+      "dtype": "float64",
+      "null_count": 7692
+    },
+    {
+      "name": "humidity_min",
+      "dtype": "float64",
+      "null_count": 7745
+    },
+    {
+      "name": "humidity_max",
+      "dtype": "float64",
+      "null_count": 7674
+    },
+    {
+      "name": "sunshine_duration",
+      "dtype": "float64",
+      "null_count": 23493
+    },
+    {
+      "name": "weather_duplicate_source",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "weather_missing_day",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "station_lon",
+      "dtype": "float64",
+      "null_count": 7822
+    },
+    {
+      "name": "amphoe",
+      "dtype": "str",
+      "null_count": 7822
+    },
+    {
+      "name": "province",
+      "dtype": "str",
+      "null_count": 7822
+    },
+    {
+      "name": "match_method",
+      "dtype": "str",
+      "null_count": 7822
+    },
+    {
+      "name": "station_lat",
+      "dtype": "float64",
+      "null_count": 7822
+    },
+    {
+      "name": "tambon",
+      "dtype": "str",
+      "null_count": 7822
+    },
+    {
+      "name": "mapping_review_required",
+      "dtype": "object",
+      "null_count": 7822
+    },
+    {
+      "name": "mapping_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "mapping_coord_mismatch",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pm25",
+      "dtype": "float64",
+      "null_count": 8975
+    },
+    {
+      "name": "pm25_source_rows",
+      "dtype": "float64",
+      "null_count": 8398
+    },
+    {
+      "name": "pm25_duplicate_source",
+      "dtype": "object",
+      "null_count": 8398
+    },
+    {
+      "name": "hotspot_count",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_sum",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_day",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_night",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_conf_low",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_conf_nominal",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_conf_high",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_fire_farming_count",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_fire_wildfire_count",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_max",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_bright_ti4_max",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_bright_ti5_max",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_min_distance_km",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_frp_mean",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_source_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_invalid_date",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_sentinel_value_found",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_wind_direction_avg_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_wind_direction_at_max_speed_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_wind_speed_avg_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_wind_speed_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_temperature_avg_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_temperature_min_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_temperature_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_rainfall_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pressure_avg_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pressure_min_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pressure_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_humidity_avg_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_humidity_min_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_humidity_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_solar_radiation_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_sunshine_duration_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_temperature_order_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pressure_order_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_humidity_order_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_wind_speed_order_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pm25_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pm25_source_rows_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_count_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_day_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_night_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_conf_low_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_conf_nominal_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_conf_high_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_fire_farming_count_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_fire_wildfire_count_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pm25_source_without_value",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pm25_value_without_source",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_pm25_duplicate_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_missing_clean",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_frp_sum_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_frp_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_frp_mean_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_bright_ti4_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_bright_ti5_max_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_min_distance_km_invalid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_daynight_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_conf_inconsistent",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_firetype_exceeds_total",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_frp_mean_gt_max",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_hotspot_frp_max_gt_sum",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "qc_any_issue",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_avg_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_max_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_avg_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_min_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_max_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_avg_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_min_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_max_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_avg_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_min_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_max_interpolated",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "interpolated_any",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "interpolated_feature_count",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "calendar_row_inserted",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_max_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_min_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_max_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_min_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_max_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_min_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_max_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "rainfall_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "rainfall_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_count_missing_original",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_count_imputed",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_present",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_mean_structural_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_min_distance_km_structural_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_bright_ti4_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_bright_ti5_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "wind_speed_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "temperature_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "pressure_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "humidity_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "segment_id",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "year",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "month",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "day",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "day_of_week",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "day_of_year",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "week_of_year",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "quarter",
+      "dtype": "int32",
+      "null_count": 0
+    },
+    {
+      "name": "year_index",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "dow_sin",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "dow_cos",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "month_sin",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "month_cos",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "doy_sin",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "doy_cos",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "wind_direction_avg_sin",
+      "dtype": "float64",
+      "null_count": 8460
+    },
+    {
+      "name": "wind_direction_avg_cos",
+      "dtype": "float64",
+      "null_count": 8460
+    },
+    {
+      "name": "wind_direction_at_max_speed_sin",
+      "dtype": "float64",
+      "null_count": 8851
+    },
+    {
+      "name": "wind_direction_at_max_speed_cos",
+      "dtype": "float64",
+      "null_count": 8851
+    },
+    {
+      "name": "temperature_range",
+      "dtype": "float64",
+      "null_count": 7000
+    },
+    {
+      "name": "humidity_range",
+      "dtype": "float64",
+      "null_count": 7745
+    },
+    {
+      "name": "pressure_range",
+      "dtype": "float64",
+      "null_count": 7032
+    },
+    {
+      "name": "rain_event",
+      "dtype": "float64",
+      "null_count": 8463
+    },
+    {
+      "name": "hotspot_day_ratio",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "hotspot_night_ratio",
+      "dtype": "float64",
+      "null_count": 149476
+    },
+    {
+      "name": "log1p_rainfall",
+      "dtype": "float64",
+      "null_count": 8463
+    },
+    {
+      "name": "log1p_hotspot_count",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "log1p_hotspot_frp_sum",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_lag_1",
+      "dtype": "float64",
+      "null_count": 9637
+    },
+    {
+      "name": "pm25_lag_2",
+      "dtype": "float64",
+      "null_count": 10084
+    },
+    {
+      "name": "pm25_lag_3",
+      "dtype": "float64",
+      "null_count": 10740
+    },
+    {
+      "name": "pm25_lag_7",
+      "dtype": "float64",
+      "null_count": 13313
+    },
+    {
+      "name": "pm25_lag_14",
+      "dtype": "float64",
+      "null_count": 17620
+    },
+    {
+      "name": "temperature_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7684
+    },
+    {
+      "name": "temperature_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 8995
+    },
+    {
+      "name": "temperature_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11546
+    },
+    {
+      "name": "humidity_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 8400
+    },
+    {
+      "name": "humidity_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 9718
+    },
+    {
+      "name": "humidity_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 12286
+    },
+    {
+      "name": "pressure_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7629
+    },
+    {
+      "name": "pressure_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 8946
+    },
+    {
+      "name": "pressure_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11506
+    },
+    {
+      "name": "wind_speed_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7353
+    },
+    {
+      "name": "wind_speed_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 8676
+    },
+    {
+      "name": "wind_speed_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11254
+    },
+    {
+      "name": "rainfall_lag_1",
+      "dtype": "float64",
+      "null_count": 9178
+    },
+    {
+      "name": "rainfall_lag_3",
+      "dtype": "float64",
+      "null_count": 10458
+    },
+    {
+      "name": "rainfall_lag_7",
+      "dtype": "float64",
+      "null_count": 12947
+    },
+    {
+      "name": "hotspot_count_lag_1",
+      "dtype": "float64",
+      "null_count": 716
+    },
+    {
+      "name": "hotspot_count_lag_3",
+      "dtype": "float64",
+      "null_count": 2137
+    },
+    {
+      "name": "hotspot_count_lag_7",
+      "dtype": "float64",
+      "null_count": 4921
+    },
+    {
+      "name": "hotspot_frp_sum_lag_1",
+      "dtype": "float64",
+      "null_count": 716
+    },
+    {
+      "name": "hotspot_frp_sum_lag_3",
+      "dtype": "float64",
+      "null_count": 2137
+    },
+    {
+      "name": "hotspot_frp_sum_lag_7",
+      "dtype": "float64",
+      "null_count": 4921
+    },
+    {
+      "name": "pm25_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 8403
+    },
+    {
+      "name": "pm25_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 8403
+    },
+    {
+      "name": "pm25_roll_mean_14d",
+      "dtype": "float64",
+      "null_count": 8403
+    },
+    {
+      "name": "pm25_roll_std_3d",
+      "dtype": "float64",
+      "null_count": 9423
+    },
+    {
+      "name": "pm25_roll_std_7d",
+      "dtype": "float64",
+      "null_count": 9067
+    },
+    {
+      "name": "pm25_roll_min_7d",
+      "dtype": "float64",
+      "null_count": 8403
+    },
+    {
+      "name": "pm25_roll_max_7d",
+      "dtype": "float64",
+      "null_count": 8403
+    },
+    {
+      "name": "temperature_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6194
+    },
+    {
+      "name": "temperature_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 4986
+    },
+    {
+      "name": "humidity_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6909
+    },
+    {
+      "name": "humidity_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 5704
+    },
+    {
+      "name": "pressure_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6169
+    },
+    {
+      "name": "pressure_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 4997
+    },
+    {
+      "name": "wind_speed_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 5834
+    },
+    {
+      "name": "wind_speed_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 4659
+    },
+    {
+      "name": "rainfall_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 7721
+    },
+    {
+      "name": "rainfall_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 7651
+    },
+    {
+      "name": "rainfall_roll_sum_14d",
+      "dtype": "float64",
+      "null_count": 7651
+    },
+    {
+      "name": "rain_days_7d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_count_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_count_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_sum_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_frp_sum_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "hotspot_active_days_7d",
+      "dtype": "float64",
+      "null_count": 0
+    },
+    {
+      "name": "pm25_diff_1d",
+      "dtype": "float64",
+      "null_count": 10031
+    },
+    {
+      "name": "pm25_diff_3d",
+      "dtype": "float64",
+      "null_count": 11312
+    },
+    {
+      "name": "temperature_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8101
+    },
+    {
+      "name": "humidity_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8813
+    },
+    {
+      "name": "pressure_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8032
+    },
+    {
+      "name": "wind_speed_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 7780
+    },
+    {
+      "name": "hotspot_count_diff_1d",
+      "dtype": "float64",
+      "null_count": 716
+    },
+    {
+      "name": "target_pm25_t1",
+      "dtype": "float64",
+      "null_count": 9637
+    },
+    {
+      "name": "target_pm25_t1_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "target_pm25_t2",
+      "dtype": "float64",
+      "null_count": 10297
+    },
+    {
+      "name": "target_pm25_t2_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "target_pm25_t3",
+      "dtype": "float64",
+      "null_count": 10953
+    },
+    {
+      "name": "target_pm25_t3_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "target_pm25_t7",
+      "dtype": "float64",
+      "null_count": 13525
+    },
+    {
+      "name": "target_pm25_t7_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "missing_feature_count",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "imputed_feature_count",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "imputed_any",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "history_days_available",
+      "dtype": "int64",
+      "null_count": 0
+    },
+    {
+      "name": "max_required_lag_available",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "xgboost_history_valid",
+      "dtype": "bool",
+      "null_count": 0
+    },
+    {
+      "name": "tft_history_valid",
+      "dtype": "bool",
+      "null_count": 0
+    }
+  ],
+  "row_count": 199262,
+  "column_count": 257
+}
