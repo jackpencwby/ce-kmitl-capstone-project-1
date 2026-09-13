@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(../.venv/Scripts/python.exe tests/test_prep_fields.py)",
+      "Bash(../.venv/Scripts/python.exe eval_from_artifacts.py)"
+    ]
+  }
+}
