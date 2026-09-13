@@ -18,6 +18,28 @@ overridden rather than followed.
 
 ## Final feature set
 
+**R2 training revision (2026-09-13):** the feature columns below are unchanged.
+The notebook now uses deterministic MSE, training-only standard scaling,
+validation-based early stopping and best-checkpoint loading. For a fixed
+evaluation target, maximizing R2 is equivalent to minimizing squared error;
+quantile loss instead targets quantiles. This motivates trying MSE, but does
+not establish a measured improvement. Per-group standardized MSE is only a
+surrogate for the reported mean station R2. See the
+[scikit-learn scoring guidance](https://scikit-learn.org/stable/modules/model_evaluation.html#which-scoring-function-should-i-use)
+and [Darts TFT loss_fn documentation](https://unit8co.github.io/darts/generated_api/darts.models.forecasting.tft_model.html).
+We retain the 28-day encoder and seven-day direct horizon. The 64-unit hidden
+state and 16-unit continuous representation follow the starting heuristic in
+`REFERENCE.md` section 9; these are candidate settings, not experimentally
+selected optima. No additional lag, geographic, weather, or fire features
+have been justified by an ablation in this revision.
+
+Residual notebook gaps are now forward-filled with leading incomplete rows
+trimmed, replacing the interpolation described in the historical notes below.
+Sensor eligibility uses training dates. Validation includes training encoder
+context and ends before a separate final 60-day test period. Evaluation excludes
+source labels marked missing or imputed. These flags are used for scoring only,
+not as model inputs. Upstream CSV imputation remains an audit limitation.
+
 | Role (Darts) | Columns | Count |
 |---|---|---|
 | Target | `pm25` | 1 |
