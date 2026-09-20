@@ -59,6 +59,9 @@
 | `--check-gcs` | ทดสอบการเชื่อมต่อ GCP จาก `.env` ก่อนรัน |
 | `--max-stations N` | จำกัดจำนวนสถานี (ใช้ทดสอบเร็ว ๆ) |
 | `--prefer-cpu` | บังคับใช้ CPU แม้มี GPU |
+| `--upload-gcs` | หลังเทรนเสร็จ **อัปโหลดโฟลเดอร์ artifacts ทั้งหมดขึ้น GCS** (ต้องใช้คู่กับ `--train`) |
+| `--gcs-artifacts-prefix PATH` | เปลี่ยนโฟลเดอร์ปลายทางใน bucket (ค่าเริ่มต้น `experiment-stage-1/artifacts`) |
+| `--no-keep-local` | ลบโฟลเดอร์ artifacts บนเครื่องหลังอัปโหลดขึ้น GCS สำเร็จ (ค่าเริ่มต้นคือเก็บไว้) |
 | `--log-level DEBUG` | ระดับ log (DEBUG / INFO / WARNING) |
 
 > **flag ที่ตอบโจทย์ "จะเทรนกับสถานีไหน"** คือ `--stations`
@@ -194,6 +197,30 @@ Elapsed seconds                       : 38.7
 
 **ตัวชี้วัดหลัก (primary metric)** คือ `Primary macro RMSE` (เฉลี่ยข้าม
 สถานี × horizon) โมเดลควรทำได้ **ดีกว่า** `Naive persistence` จึงจะถือว่ามีประโยชน์
+
+### 7.1 อัปโหลด artifacts ขึ้น Cloud Storage
+
+ถ้าอยากให้ผลลัพธ์ขึ้น GCS อัตโนมัติหลังเทรนเสร็จ ให้เติม `--upload-gcs`
+(ใช้คู่กับ `--train` เสมอ) ระบบจะอัปโหลดทั้งโฟลเดอร์ run ขึ้นไปที่
+`gs://<GCS_BUCKET>/experiment-stage-1/artifacts/<run_id>__<timestamp>/`
+โดยเก็บโครงสร้างไฟล์เหมือนบนเครื่อง:
+
+```powershell
+.venv/Scripts/python.exe experiment-stage-1/E1_1.py --train --stations 72 --upload-gcs
+```
+
+หลังรันจะพิมพ์ทั้ง path บนเครื่องและ URI บน GCS:
+
+```
+Artifacts (local): ...\experiment-stage-1\artifacts\E1_LOCAL__...__20260920_162545
+Artifacts (GCS) : gs://kmitl-capstone-project-data-bucket/experiment-stage-1/artifacts/E1_LOCAL__...__20260920_162545
+```
+
+- เปลี่ยนโฟลเดอร์ปลายทางใน bucket ได้ด้วย `--gcs-artifacts-prefix <path>`
+- อยากให้ลบสำเนาบนเครื่องหลังอัปโหลดสำเร็จ ใช้ `--no-keep-local`
+- ถ้าอัปโหลดล้มเหลว ระบบจะ **ไม่ลบ** ไฟล์บนเครื่อง และแจ้ง `[warn]` ให้ทราบ
+  (run ไม่หาย เทรนใหม่ไม่ต้อง)
+- ใช้ credential ชุดเดียวกับการอ่านข้อมูล (จาก `.env`) ไม่ต้องตั้งค่าเพิ่ม
 
 ---
 

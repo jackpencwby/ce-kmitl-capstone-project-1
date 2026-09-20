@@ -68,13 +68,26 @@ def _s3_client(env: dict[str, str]):
     if not access_key or not secret_key:
         raise RuntimeError("Missing AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in .env")
 
-    return boto3.client(
-        "s3",
+    # boto3 >= 1.36 adds default request checksums (CRC32 trailers) that the
+    # GCS S3-compatible endpoint rejects with SignatureDoesNotMatch. Force
+    # them to "when_required" so plain PutObject/GetObject sign cleanly.
+    client_kwargs = dict(
         endpoint_url=GCS_S3_ENDPOINT,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         region_name="auto",
     )
+    try:
+        from botocore.config import Config as _BotoConfig
+        client_kwargs["config"] = _BotoConfig(
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        )
+    except TypeError:
+        # Older botocore without these Config options: fall back silently.
+        pass
+
+    return boto3.client("s3", **client_kwargs)
 
 
 def download_master_from_gcs(destination: Optional[Path] = None) -> Path:
@@ -91,6 +104,63 @@ def download_master_from_gcs(destination: Optional[Path] = None) -> Path:
     destination.write_bytes(body)
     LOGGER.info("Wrote %s (%d bytes)", destination, len(body))
     return destination
+
+
+def _put_object(client, bucket: str, key: str, body: bytes) -> None:
+    """Single-shot PutObject.
+
+    ``put_object`` (rather than ``upload_file``) is used deliberately: the
+    GCS S3-compatible endpoint rejects boto3's default streaming/multipart
+    checksum flow with ``SignatureDoesNotMatch``. A plain PutObject with the
+    body in memory signs cleanly. Artifact files are small (KB-MB), so this
+    is fine.
+    """
+    client.put_object(Bucket=bucket, Key=key, Body=body)
+
+
+def upload_file_to_gcs(local_path: Path, object_key: str) -> str:
+    """Upload a single file to the bucket. Returns the gs:// URI."""
+    env = load_env()
+    bucket = env.get("GCS_BUCKET") or os.getenv("GCS_BUCKET")
+    if not bucket:
+        raise RuntimeError("GCS_BUCKET is not set in .env")
+    client = _s3_client(env)
+    # Normalise key separators to POSIX-style for object storage.
+    object_key = object_key.replace(os.sep, "/").lstrip("/")
+    _put_object(client, bucket, object_key, Path(local_path).read_bytes())
+    uri = f"gs://{bucket}/{object_key}"
+    LOGGER.debug("Uploaded %s -> %s", local_path, uri)
+    return uri
+
+
+def upload_dir_to_gcs(local_dir: Path, prefix: str) -> str:
+    """Upload every file under ``local_dir`` to gs://<bucket>/<prefix>/.
+
+    The directory tree layout is preserved under ``prefix``. Returns the
+    gs:// URI of the uploaded folder (its prefix).
+    """
+    env = load_env()
+    bucket = env.get("GCS_BUCKET") or os.getenv("GCS_BUCKET")
+    if not bucket:
+        raise RuntimeError("GCS_BUCKET is not set in .env")
+    client = _s3_client(env)
+
+    local_dir = Path(local_dir)
+    base_prefix = prefix.replace(os.sep, "/").strip("/")
+    files = [p for p in local_dir.rglob("*") if p.is_file()]
+    if not files:
+        LOGGER.warning("No files to upload under %s", local_dir)
+
+    count = 0
+    for path in files:
+        rel = path.relative_to(local_dir).as_posix()
+        key = f"{base_prefix}/{rel}"
+        _put_object(client, bucket, key, path.read_bytes())
+        count += 1
+
+    folder_uri = f"gs://{bucket}/{base_prefix}"
+    LOGGER.info("Uploaded %d file(s) to %s", count, folder_uri)
+    return folder_uri
 
 
 def check_gcs_connection() -> bool:

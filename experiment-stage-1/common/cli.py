@@ -47,6 +47,24 @@ def base_parser(description: str) -> argparse.ArgumentParser:
         help="Force CPU even when a CUDA GPU is available.",
     )
     parser.add_argument(
+        "--upload-gcs", action="store_true",
+        help="After training, upload the whole run artifact folder to "
+             "Cloud Storage under GCS_ARTIFACTS_PREFIX (needs --train).",
+    )
+    parser.add_argument(
+        "--gcs-artifacts-prefix", default=None,
+        help="Override the destination folder in the bucket for uploaded "
+             f"artifacts (default: '{config.GCS_ARTIFACTS_PREFIX}').",
+    )
+    parser.add_argument(
+        "--keep-local", dest="keep_local", action="store_true", default=True,
+        help="Keep the local artifact folder after upload (default).",
+    )
+    parser.add_argument(
+        "--no-keep-local", dest="keep_local", action="store_false",
+        help="Delete the local artifact folder after a successful GCS upload.",
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         help="Logging level (DEBUG, INFO, WARNING).",
     )

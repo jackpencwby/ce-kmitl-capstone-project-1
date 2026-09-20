@@ -26,6 +26,11 @@ LOCAL_MASTER_CSV: Final[Path] = REPO_ROOT / "clean-data_preprocess_all_stations_
 # The object path below matches preprocessing_summary.json -> output_location.
 GCS_MASTER_OBJECT: Final[str] = "clean-data/preprocess/all_stations_daily.csv"
 
+# Destination prefix (folder) in the bucket where per-run artifacts are
+# uploaded when a run is invoked with --upload-gcs. Each run lands under
+# gs://<GCS_BUCKET>/<GCS_ARTIFACTS_PREFIX>/<run_id>__<timestamp>/...
+GCS_ARTIFACTS_PREFIX: Final[str] = "experiment-stage-1/artifacts"
+
 # ---------------------------------------------------------------------------
 # Frozen experiment rules (Experimental_Plan.md section 3)
 # ---------------------------------------------------------------------------

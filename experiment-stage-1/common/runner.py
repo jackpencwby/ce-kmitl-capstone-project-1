@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import random
+import shutil
 from datetime import datetime, timezone
 
 import numpy as np
@@ -147,5 +148,19 @@ def execute(spec: models.RunSpec, args) -> int:
         feature_importance=result["importance"],
         training_log=summary,
     )
-    print(f"\nArtifacts: {run_dir}")
+    print(f"\nArtifacts (local): {run_dir}")
+
+    if getattr(args, "upload_gcs", False):
+        base_prefix = getattr(args, "gcs_artifacts_prefix", None) or config.GCS_ARTIFACTS_PREFIX
+        dest_prefix = f"{base_prefix.strip('/')}/{run_dir.name}"
+        try:
+            folder_uri = data.upload_dir_to_gcs(run_dir, dest_prefix)
+            print(f"Artifacts (GCS) : {folder_uri}")
+            if not getattr(args, "keep_local", True):
+                shutil.rmtree(run_dir, ignore_errors=True)
+                print(f"Removed local copy: {run_dir}")
+        except Exception as error:  # noqa: BLE001 - upload must not lose a run
+            LOGGER.error("GCS upload failed (local artifacts kept): %s", error)
+            print(f"[warn] GCS upload failed, local artifacts kept at {run_dir}: {error}")
+
     return 0
