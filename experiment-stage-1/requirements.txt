@@ -1,0 +1,17 @@
+# Stage 1 experiment dependencies.
+# Install into the repo's CUDA-enabled venv:
+#   .venv/Scripts/python.exe -m pip install -r experiment-stage-1/requirements.txt
+
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+xgboost>=2.0        # device="cuda" + tree_method="hist"
+lightgbm>=4.0       # optional GPU build; CPU fallback otherwise
+torch>=2.0          # MLP residual corrector (E1.5), CUDA when available
+
+# GCP access via the S3-compatible Cloud Storage interoperability endpoint
+# using the HMAC keys in .env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+boto3>=1.28
+
+# Optional: parquet prediction artifacts (falls back to CSV if missing).
+pyarrow>=12.0
