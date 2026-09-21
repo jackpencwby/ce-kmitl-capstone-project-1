@@ -19,12 +19,13 @@ REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 STAGE1_DIR: Final[Path] = REPO_ROOT / "experiment-stage-1"
 ARTIFACTS_DIR: Final[Path] = STAGE1_DIR / "artifacts"
 
-# Local copy of the master preprocessed table (mirror of the GCS object).
-LOCAL_MASTER_CSV: Final[Path] = REPO_ROOT / "clean-data_preprocess_all_stations_daily.csv"
+# Local combined copy of the per-station preprocessed tables.
+LOCAL_MASTER_CSV: Final[Path] = REPO_ROOT / "clean-data_preprocess-09-19_all_stations_daily.csv"
 
 # The same table in Cloud Storage (S3-compatible interoperability endpoint).
-# The object path below matches preprocessing_summary.json -> output_location.
-GCS_MASTER_OBJECT: Final[str] = "clean-data/preprocess/all_stations_daily.csv"
+# The prefix below matches preprocessing_summary.json -> output_location.
+GCS_DATA_PREFIX: Final[str] = "clean-data/preprocess-09-19"
+GCS_STATION_FILENAME: Final[str] = "daily_dataset.csv"
 
 # Destination prefix (folder) in the bucket where per-run artifacts are
 # uploaded when a run is invoked with --upload-gcs. Each run lands under
@@ -97,6 +98,14 @@ FIRE_FEATURES: Final[tuple[str, ...]] = (
     "hotspot_present",
     "log1p_hotspot_count",
     "log1p_hotspot_frp_sum",
+)
+
+# Same-day atmospheric measurements. Missing values are encoded as zero
+# plus a flag in features.py, consistently across all experiment algorithms.
+AIR_QUALITY_FEATURES: Final[tuple[str, ...]] = (
+    "co_mean_ugm3",
+    "co_8h_max_ugm3",
+    "aod500_mean",
 )
 
 # Calendar (known future) features.
@@ -251,5 +260,7 @@ def baseline_feature_list() -> list[str]:
     feats += [f"pm25_roll_std_{w}" for w in PM25_ROLL_WINDOWS]
     feats += list(WEATHER_FEATURES)
     feats += list(FIRE_FEATURES)
+    feats += list(AIR_QUALITY_FEATURES)
+    feats += [f"{col}_missing" for col in AIR_QUALITY_FEATURES]
     feats += list(CALENDAR_FEATURES)
     return feats

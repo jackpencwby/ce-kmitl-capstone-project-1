@@ -1,0 +1,1950 @@
+{
+  "columns": [
+    {
+      "name": "date",
+      "dtype": "datetime64[us]",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "station_id",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "station_name",
+      "dtype": "str",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "lat",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "long",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_direction_avg",
+      "dtype": "float64",
+      "null_count": 8518,
+      "null_fraction": 0.04208206942207555
+    },
+    {
+      "name": "wind_direction_at_max_speed",
+      "dtype": "float64",
+      "null_count": 8911,
+      "null_fraction": 0.044023634728823105
+    },
+    {
+      "name": "wind_speed_avg",
+      "dtype": "float64",
+      "null_count": 6677,
+      "null_fraction": 0.03298684873575938
+    },
+    {
+      "name": "wind_speed_max",
+      "dtype": "float64",
+      "null_count": 6613,
+      "null_fraction": 0.03267066507257403
+    },
+    {
+      "name": "temperature_avg",
+      "dtype": "float64",
+      "null_count": 7016,
+      "null_fraction": 0.0346616340766943
+    },
+    {
+      "name": "temperature_min",
+      "dtype": "float64",
+      "null_count": 7016,
+      "null_fraction": 0.0346616340766943
+    },
+    {
+      "name": "temperature_max",
+      "dtype": "float64",
+      "null_count": 7031,
+      "null_fraction": 0.034735739622753364
+    },
+    {
+      "name": "rainfall",
+      "dtype": "float64",
+      "null_count": 8521,
+      "null_fraction": 0.04209689053128736
+    },
+    {
+      "name": "pressure_avg",
+      "dtype": "float64",
+      "null_count": 6991,
+      "null_fraction": 0.03453812483326252
+    },
+    {
+      "name": "pressure_min",
+      "dtype": "float64",
+      "null_count": 7053,
+      "null_fraction": 0.03484442775697333
+    },
+    {
+      "name": "pressure_max",
+      "dtype": "float64",
+      "null_count": 7031,
+      "null_fraction": 0.034735739622753364
+    },
+    {
+      "name": "humidity_avg",
+      "dtype": "float64",
+      "null_count": 7728,
+      "null_fraction": 0.03817917732963135
+    },
+    {
+      "name": "humidity_min",
+      "dtype": "float64",
+      "null_count": 7781,
+      "null_fraction": 0.03844101692570672
+    },
+    {
+      "name": "humidity_max",
+      "dtype": "float64",
+      "null_count": 7710,
+      "null_fraction": 0.03809025067436047
+    },
+    {
+      "name": "sunshine_duration",
+      "dtype": "float64",
+      "null_count": 24097,
+      "null_fraction": 0.1190480895590226
+    },
+    {
+      "name": "weather_duplicate_source",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "weather_missing_day",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "station_lon",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "tambon",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "amphoe",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "match_method",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "station_lat",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "province",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "mapping_review_required",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "mapping_missing",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "mapping_coord_mismatch",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25",
+      "dtype": "float64",
+      "null_count": 9076,
+      "null_fraction": 0.04483879573547284
+    },
+    {
+      "name": "pm25_source_rows",
+      "dtype": "float64",
+      "null_count": 8485,
+      "null_fraction": 0.0419190372207456
+    },
+    {
+      "name": "pm25_duplicate_source",
+      "dtype": "object",
+      "null_count": 8485,
+      "null_fraction": 0.0419190372207456
+    },
+    {
+      "name": "hotspot_count",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_sum",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_day",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_night",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_conf_low",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_conf_nominal",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_conf_high",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_fire_farming_count",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_fire_wildfire_count",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_max",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_bright_ti4_max",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_bright_ti5_max",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_min_distance_km",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_frp_mean",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_source_available",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_station_lat",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_station_lon",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_grid_lat",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_grid_lon",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_mean_ugm3",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_max_ugm3",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_std_ugm3",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_8h_max_ugm3",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_valid_hours",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_expected_hours",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_coverage_fraction",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_valid_8h_windows",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_min_valid_hours",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_missing",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_quality_ok",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_source",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_data_type",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_timezone",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_retrieved_at_utc",
+      "dtype": "object",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_aggregation_version",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_source_available",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod500_mean",
+      "dtype": "float64",
+      "null_count": 35329,
+      "null_fraction": 0.174538322448052
+    },
+    {
+      "name": "aod_n_hours_observed",
+      "dtype": "float64",
+      "null_count": 9103,
+      "null_fraction": 0.044972185718379167
+    },
+    {
+      "name": "aod_n_hours_total",
+      "dtype": "float64",
+      "null_count": 9103,
+      "null_fraction": 0.044972185718379167
+    },
+    {
+      "name": "aod_source_available",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod_missing",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_invalid_date",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_sentinel_value_found",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_wind_direction_avg_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_wind_direction_at_max_speed_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_wind_speed_avg_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_wind_speed_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_temperature_avg_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_temperature_min_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_temperature_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_rainfall_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pressure_avg_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pressure_min_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pressure_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_humidity_avg_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_humidity_min_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_humidity_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_solar_radiation_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_sunshine_duration_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_temperature_order_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pressure_order_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_humidity_order_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_wind_speed_order_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pm25_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pm25_source_rows_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_count_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_day_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_night_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_conf_low_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_conf_nominal_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_conf_high_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_fire_farming_count_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_fire_wildfire_count_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pm25_source_without_value",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pm25_value_without_source",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_pm25_duplicate_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25_missing_clean",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_frp_sum_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_frp_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_frp_mean_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_bright_ti4_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_bright_ti5_max_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_min_distance_km_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_daynight_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_conf_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_firetype_exceeds_total",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_frp_mean_gt_max",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_hotspot_frp_max_gt_sum",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_mean_ugm3_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_max_ugm3_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_std_ugm3_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_8h_max_ugm3_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_valid_hours_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_expected_hours_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_valid_8h_windows_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_min_valid_hours_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_coverage_fraction_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_order_inconsistent",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_co_quality_rejected",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_missing_clean",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_aod500_mean_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_aod_n_hours_observed_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_aod_n_hours_total_invalid",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod_coverage_fraction",
+      "dtype": "float64",
+      "null_count": 9103,
+      "null_fraction": 0.044972185718379167
+    },
+    {
+      "name": "qc_aod_quality_rejected",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod_quality_ok",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod_missing_clean",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "qc_any_issue",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_avg_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_max_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_avg_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_min_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_max_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_avg_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_min_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_max_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_avg_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_min_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_max_interpolated",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "interpolated_any",
+      "dtype": "object",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "interpolated_feature_count",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "calendar_row_inserted",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_present",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_mean_structural_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_min_distance_km_structural_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_bright_ti4_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_bright_ti5_max_structural_missing",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_avg_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_min_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_max_reverted_interpolation",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_speed_max_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_min_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "temperature_max_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_min_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pressure_max_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_avg_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_avg_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_min_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_min_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_max_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "humidity_max_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_mean_ugm3_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_mean_ugm3_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "rainfall_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "rainfall_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_count_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_count_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_8h_max_ugm3_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_8h_max_ugm3_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod500_mean_missing_original",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "aod500_mean_imputed",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "segment_id",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "year",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "month",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "day",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "day_of_week",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "day_of_year",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "week_of_year",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "quarter",
+      "dtype": "int32",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "year_index",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "dow_sin",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "dow_cos",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "month_sin",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "month_cos",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "doy_sin",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "doy_cos",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "wind_direction_avg_sin",
+      "dtype": "float64",
+      "null_count": 8518,
+      "null_fraction": 0.04208206942207555
+    },
+    {
+      "name": "wind_direction_avg_cos",
+      "dtype": "float64",
+      "null_count": 8518,
+      "null_fraction": 0.04208206942207555
+    },
+    {
+      "name": "wind_direction_at_max_speed_sin",
+      "dtype": "float64",
+      "null_count": 8911,
+      "null_fraction": 0.044023634728823105
+    },
+    {
+      "name": "wind_direction_at_max_speed_cos",
+      "dtype": "float64",
+      "null_count": 8911,
+      "null_fraction": 0.044023634728823105
+    },
+    {
+      "name": "temperature_range",
+      "dtype": "float64",
+      "null_count": 7035,
+      "null_fraction": 0.03475550110170245
+    },
+    {
+      "name": "humidity_range",
+      "dtype": "float64",
+      "null_count": 7781,
+      "null_fraction": 0.03844101692570672
+    },
+    {
+      "name": "pressure_range",
+      "dtype": "float64",
+      "null_count": 7095,
+      "null_fraction": 0.03505192328593872
+    },
+    {
+      "name": "rain_event",
+      "dtype": "float64",
+      "null_count": 8521,
+      "null_fraction": 0.04209689053128736
+    },
+    {
+      "name": "hotspot_day_ratio",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "hotspot_night_ratio",
+      "dtype": "float64",
+      "null_count": 152484,
+      "null_fraction": 0.7533273390180522
+    },
+    {
+      "name": "log1p_rainfall",
+      "dtype": "float64",
+      "null_count": 8521,
+      "null_fraction": 0.04209689053128736
+    },
+    {
+      "name": "log1p_hotspot_count",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "log1p_hotspot_frp_sum",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "pm25_lag_1",
+      "dtype": "float64",
+      "null_count": 9746,
+      "null_fraction": 0.04814884345944451
+    },
+    {
+      "name": "pm25_lag_2",
+      "dtype": "float64",
+      "null_count": 10414,
+      "null_fraction": 0.05144901044394162
+    },
+    {
+      "name": "pm25_lag_3",
+      "dtype": "float64",
+      "null_count": 11076,
+      "null_fraction": 0.054719535210015116
+    },
+    {
+      "name": "pm25_lag_7",
+      "dtype": "float64",
+      "null_count": 13672,
+      "null_fraction": 0.067544735047971
+    },
+    {
+      "name": "pm25_lag_14",
+      "dtype": "float64",
+      "null_count": 17994,
+      "null_fraction": 0.08889701305245684
+    },
+    {
+      "name": "temperature_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7726,
+      "null_fraction": 0.03816929659015681
+    },
+    {
+      "name": "temperature_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 9049,
+      "null_fraction": 0.04470540575256652
+    },
+    {
+      "name": "temperature_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11622,
+      "null_fraction": 0.05741697708656516
+    },
+    {
+      "name": "humidity_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 8442,
+      "null_fraction": 0.041706601322042944
+    },
+    {
+      "name": "humidity_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 9772,
+      "null_fraction": 0.04827729307261355
+    },
+    {
+      "name": "humidity_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 12362,
+      "null_fraction": 0.0610728506921458
+    },
+    {
+      "name": "pressure_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7699,
+      "null_fraction": 0.03803590660725049
+    },
+    {
+      "name": "pressure_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 9028,
+      "null_fraction": 0.044601657988083826
+    },
+    {
+      "name": "pressure_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11610,
+      "null_fraction": 0.057357692649717906
+    },
+    {
+      "name": "wind_speed_avg_lag_1",
+      "dtype": "float64",
+      "null_count": 7395,
+      "null_fraction": 0.036534034207120064
+    },
+    {
+      "name": "wind_speed_avg_lag_3",
+      "dtype": "float64",
+      "null_count": 8730,
+      "null_fraction": 0.04312942780637703
+    },
+    {
+      "name": "wind_speed_avg_lag_7",
+      "dtype": "float64",
+      "null_count": 11330,
+      "null_fraction": 0.05597438912328199
+    },
+    {
+      "name": "rainfall_lag_1",
+      "dtype": "float64",
+      "null_count": 9243,
+      "null_fraction": 0.04566383748159712
+    },
+    {
+      "name": "rainfall_lag_3",
+      "dtype": "float64",
+      "null_count": 10535,
+      "null_fraction": 0.05204679518215143
+    },
+    {
+      "name": "rainfall_lag_7",
+      "dtype": "float64",
+      "null_count": 13037,
+      "null_fraction": 0.06440760026480381
+    },
+    {
+      "name": "hotspot_count_lag_1",
+      "dtype": "float64",
+      "null_count": 723,
+      "null_fraction": 0.0035718873200470324
+    },
+    {
+      "name": "hotspot_count_lag_3",
+      "dtype": "float64",
+      "null_count": 2158,
+      "null_fraction": 0.010661317893031114
+    },
+    {
+      "name": "hotspot_count_lag_7",
+      "dtype": "float64",
+      "null_count": 4966,
+      "null_fraction": 0.02453387611528847
+    },
+    {
+      "name": "hotspot_frp_sum_lag_1",
+      "dtype": "float64",
+      "null_count": 723,
+      "null_fraction": 0.0035718873200470324
+    },
+    {
+      "name": "hotspot_frp_sum_lag_3",
+      "dtype": "float64",
+      "null_count": 2158,
+      "null_fraction": 0.010661317893031114
+    },
+    {
+      "name": "hotspot_frp_sum_lag_7",
+      "dtype": "float64",
+      "null_count": 4966,
+      "null_fraction": 0.02453387611528847
+    },
+    {
+      "name": "co_mean_ugm3_lag_1",
+      "dtype": "float64",
+      "null_count": 8578,
+      "null_fraction": 0.04237849160631182
+    },
+    {
+      "name": "co_mean_ugm3_lag_3",
+      "dtype": "float64",
+      "null_count": 9911,
+      "null_fraction": 0.048964004466094245
+    },
+    {
+      "name": "co_mean_ugm3_lag_7",
+      "dtype": "float64",
+      "null_count": 12517,
+      "null_fraction": 0.06183860800142282
+    },
+    {
+      "name": "co_8h_max_ugm3_lag_1",
+      "dtype": "float64",
+      "null_count": 8578,
+      "null_fraction": 0.04237849160631182
+    },
+    {
+      "name": "co_8h_max_ugm3_lag_3",
+      "dtype": "float64",
+      "null_count": 9911,
+      "null_fraction": 0.048964004466094245
+    },
+    {
+      "name": "co_8h_max_ugm3_lag_7",
+      "dtype": "float64",
+      "null_count": 12517,
+      "null_fraction": 0.06183860800142282
+    },
+    {
+      "name": "aod500_mean_lag_1",
+      "dtype": "float64",
+      "null_count": 35880,
+      "null_fraction": 0.17726046617328842
+    },
+    {
+      "name": "aod500_mean_lag_3",
+      "dtype": "float64",
+      "null_count": 37018,
+      "null_fraction": 0.18288260693430297
+    },
+    {
+      "name": "aod500_mean_lag_7",
+      "dtype": "float64",
+      "null_count": 39137,
+      "null_fraction": 0.1933512504075805
+    },
+    {
+      "name": "pm25_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 8501,
+      "null_fraction": 0.041998083136541936
+    },
+    {
+      "name": "pm25_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 8501,
+      "null_fraction": 0.041998083136541936
+    },
+    {
+      "name": "pm25_roll_mean_14d",
+      "dtype": "float64",
+      "null_count": 8501,
+      "null_fraction": 0.041998083136541936
+    },
+    {
+      "name": "pm25_roll_std_3d",
+      "dtype": "float64",
+      "null_count": 9529,
+      "null_fraction": 0.04707678322645667
+    },
+    {
+      "name": "pm25_roll_std_7d",
+      "dtype": "float64",
+      "null_count": 9173,
+      "null_fraction": 0.04531801159998814
+    },
+    {
+      "name": "pm25_roll_min_7d",
+      "dtype": "float64",
+      "null_count": 8501,
+      "null_fraction": 0.041998083136541936
+    },
+    {
+      "name": "pm25_roll_max_7d",
+      "dtype": "float64",
+      "null_count": 8501,
+      "null_fraction": 0.041998083136541936
+    },
+    {
+      "name": "temperature_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6218,
+      "null_fraction": 0.030719219026351934
+    },
+    {
+      "name": "temperature_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 5002,
+      "null_fraction": 0.02471172942583023
+    },
+    {
+      "name": "humidity_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6933,
+      "null_fraction": 0.034251583388500796
+    },
+    {
+      "name": "humidity_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 5720,
+      "null_fraction": 0.028258914897190904
+    },
+    {
+      "name": "pressure_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 6221,
+      "null_fraction": 0.030734040135563745
+    },
+    {
+      "name": "pressure_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 5041,
+      "null_fraction": 0.024904403845583803
+    },
+    {
+      "name": "wind_speed_avg_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 5858,
+      "null_fraction": 0.028940685920934323
+    },
+    {
+      "name": "wind_speed_avg_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 4675,
+      "null_fraction": 0.023096228521742566
+    },
+    {
+      "name": "rainfall_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 7774,
+      "null_fraction": 0.03840643433754582
+    },
+    {
+      "name": "rainfall_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 7704,
+      "null_fraction": 0.03806060845593684
+    },
+    {
+      "name": "rainfall_roll_sum_14d",
+      "dtype": "float64",
+      "null_count": 7704,
+      "null_fraction": 0.03806060845593684
+    },
+    {
+      "name": "rain_days_7d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_count_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_count_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_sum_roll_sum_3d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_frp_sum_roll_sum_7d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "hotspot_active_days_7d",
+      "dtype": "float64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "co_mean_ugm3_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_mean_ugm3_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_8h_max_ugm3_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "co_8h_max_ugm3_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 7906,
+      "null_fraction": 0.03905856314286561
+    },
+    {
+      "name": "aod500_mean_roll_mean_3d",
+      "dtype": "float64",
+      "null_count": 14104,
+      "null_fraction": 0.06967897477447212
+    },
+    {
+      "name": "aod500_mean_roll_mean_7d",
+      "dtype": "float64",
+      "null_count": 9102,
+      "null_fraction": 0.04496724534864189
+    },
+    {
+      "name": "pm25_diff_1d",
+      "dtype": "float64",
+      "null_count": 10143,
+      "null_fraction": 0.050110170245141146
+    },
+    {
+      "name": "pm25_diff_3d",
+      "dtype": "float64",
+      "null_count": 11650,
+      "null_fraction": 0.05755530743920875
+    },
+    {
+      "name": "temperature_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8149,
+      "null_fraction": 0.040259072989022496
+    },
+    {
+      "name": "humidity_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8862,
+      "null_fraction": 0.04378155661169682
+    },
+    {
+      "name": "pressure_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 8108,
+      "null_fraction": 0.04005651782979438
+    },
+    {
+      "name": "wind_speed_avg_diff_1d",
+      "dtype": "float64",
+      "null_count": 7828,
+      "null_fraction": 0.03867321430335846
+    },
+    {
+      "name": "hotspot_count_diff_1d",
+      "dtype": "float64",
+      "null_count": 723,
+      "null_fraction": 0.0035718873200470324
+    },
+    {
+      "name": "co_mean_ugm3_diff_1d",
+      "dtype": "float64",
+      "null_count": 8578,
+      "null_fraction": 0.04237849160631182
+    },
+    {
+      "name": "target_pm25_t1",
+      "dtype": "float64",
+      "null_count": 9745,
+      "null_fraction": 0.048143903089707236
+    },
+    {
+      "name": "target_pm25_t1_available",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "target_pm25_t2",
+      "dtype": "float64",
+      "null_count": 10411,
+      "null_fraction": 0.05143418933472981
+    },
+    {
+      "name": "target_pm25_t2_available",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "target_pm25_t3",
+      "dtype": "float64",
+      "null_count": 11074,
+      "null_fraction": 0.054709654470540575
+    },
+    {
+      "name": "target_pm25_t3_available",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "target_pm25_t7",
+      "dtype": "float64",
+      "null_count": 13668,
+      "null_fraction": 0.0675249735690219
+    },
+    {
+      "name": "target_pm25_t7_available",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "missing_feature_count",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "imputed_feature_count",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "imputed_any",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "history_days_available",
+      "dtype": "int64",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "max_required_lag_available",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "xgboost_history_valid",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    },
+    {
+      "name": "tft_history_valid",
+      "dtype": "bool",
+      "null_count": 0,
+      "null_fraction": 0.0
+    }
+  ],
+  "row_count": 202414,
+  "column_count": 324
+}

@@ -102,7 +102,9 @@ def write_json(path: Path, obj: dict) -> None:
 def dataset_manifest(df: pd.DataFrame, stations: list) -> dict:
     return {
         "master_local_path": str(config.LOCAL_MASTER_CSV),
-        "master_gcs_object": config.GCS_MASTER_OBJECT,
+        "dataset_gcs_prefix": config.GCS_DATA_PREFIX,
+        "station_file_pattern": f"<station>/{config.GCS_STATION_FILENAME}",
+        "co_aod_missing_policy": "zero placeholder with per-feature missing indicator",
         "master_sha256": _file_hash(config.LOCAL_MASTER_CSV),
         "n_rows": int(len(df)),
         "date_min": str(df[config.DATE_COL].min().date()),

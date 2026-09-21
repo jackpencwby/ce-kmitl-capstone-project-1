@@ -13,7 +13,7 @@
 ## 1. สิ่งที่ต้องเตรียม
 
 - Python 3.12 (ใช้ venv ของ repo ที่ `.venv` — เป็นตัวที่รองรับ CUDA อยู่แล้ว)
-- ไฟล์ข้อมูลหลัก `clean-data_preprocess_all_stations_daily.csv` ที่ root ของ repo
+- ไฟล์ข้อมูลหลัก `clean-data_preprocess-09-19_all_stations_daily.csv` ที่ root ของ repo
   (มีอยู่แล้ว) หรือจะโหลดจาก GCS ก็ได้
 - ไฟล์ `.env` ที่ root ของ repo (มี HMAC key ของ Cloud Storage อยู่แล้ว)
 
@@ -155,8 +155,16 @@ GCS_BUCKET              = kmitl-capstone-project-data-bucket
 ```
 
 ไฟล์ข้อมูลหลักอยู่ที่
-`gs://<GCS_BUCKET>/clean-data/preprocess/all_stations_daily.csv`
+`gs://<GCS_BUCKET>/clean-data/preprocess-09-19/<station>/daily_dataset.csv`
+เช่น `1003_Nakhon Nayok Weather Observing Station/daily_dataset.csv`
+เมื่อใช้ `--source gcs` ระบบจะรวมไฟล์ทุกสถานีเป็น
+`clean-data_preprocess-09-19_all_stations_daily.csv` ที่ root ของ repo
 ระบบจะใช้ไฟล์ local ก่อนเสมอ ถ้าต้องการโหลดใหม่จาก GCS ให้ใช้ `--source gcs`
+
+ทุก experiment ใช้ CO (`co_mean_ugm3`, `co_8h_max_ugm3`) และ AOD
+(`aod500_mean`) พร้อม flag `_missing` ของแต่ละคอลัมน์
+ค่าที่ขาดหายใช้ 0 คู่กับ flag เพื่อเก็บแถวนั้นไว้โดยไม่ใช้ข้อมูลอนาคต
+baseline ใหม่มี 33 features จึงควรรันทุก experiment ใหม่เพื่อเปรียบเทียบกัน
 
 > ไม่ต้องแก้โค้ดใด ๆ แค่มี `.env` ที่ถูกต้องก็เชื่อมต่อได้
 

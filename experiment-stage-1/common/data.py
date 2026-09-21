@@ -1,8 +1,9 @@
 """Dataset loading, GCP connection, and eligible-group filtering.
 
 The master preprocessed table lives both locally
-(``clean-data_preprocess_all_stations_daily.csv``) and in Cloud Storage
-(``gs://<bucket>/clean-data/preprocess/all_stations_daily.csv``).
+(``clean-data_preprocess-09-19_all_stations_daily.csv``) and in Cloud Storage
+(``gs://<bucket>/clean-data/preprocess-09-19/<station>/daily_dataset.csv``).
+The station files are combined into the local cache when downloading.
 
 GCP access uses the credentials in the repo ``.env``. The access key there
 starts with ``GOOG1E...`` which is a **Cloud Storage HMAC key**, so the
@@ -13,10 +14,10 @@ forces a download.
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 from pathlib import Path
+import tempfile
 from typing import Optional
 
 import pandas as pd
@@ -90,19 +91,55 @@ def _s3_client(env: dict[str, str]):
     return boto3.client("s3", **client_kwargs)
 
 
+def _station_objects(client, bucket: str) -> list[str]:
+    """Find only daily datasets in immediate station folders, across all pages."""
+    prefix = config.GCS_DATA_PREFIX.rstrip("/") + "/"
+    keys = []
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            parts = key[len(prefix):].split("/")
+            if key.startswith(prefix) and len(parts) == 2 and parts[0] and parts[1] == config.GCS_STATION_FILENAME:
+                keys.append(key)
+    if not keys:
+        raise FileNotFoundError(f"No station daily datasets found at gs://{bucket}/{prefix}")
+    return sorted(keys)
+
+
 def download_master_from_gcs(destination: Optional[Path] = None) -> Path:
-    """Download the master CSV from GCS via the S3-compatible endpoint."""
+    """Combine GCS station CSVs, replacing the local cache only after success."""
     env = load_env()
     bucket = env.get("GCS_BUCKET") or os.getenv("GCS_BUCKET")
     if not bucket:
         raise RuntimeError("GCS_BUCKET is not set in .env")
     destination = destination or config.LOCAL_MASTER_CSV
     client = _s3_client(env)
-    LOGGER.info("Downloading gs://%s/%s", bucket, config.GCS_MASTER_OBJECT)
-    obj = client.get_object(Bucket=bucket, Key=config.GCS_MASTER_OBJECT)
-    body = obj["Body"].read()
-    destination.write_bytes(body)
-    LOGGER.info("Wrote %s (%d bytes)", destination, len(body))
+    keys = _station_objects(client, bucket)
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="",
+                                         dir=destination.parent, suffix=".csv", delete=False) as output:
+            temporary = Path(output.name)
+            columns = None
+            for index, key in enumerate(keys):
+                LOGGER.info("Downloading station %d/%d: gs://%s/%s", index + 1, len(keys), bucket, key)
+                body = client.get_object(Bucket=bucket, Key=key)["Body"]
+                try:
+                    frame = pd.read_csv(body, low_memory=False)
+                finally:
+                    body.close()
+                if columns is None:
+                    columns = frame.columns.tolist()
+                elif set(frame.columns) != set(columns):
+                    raise ValueError(f"Station dataset has inconsistent columns: {key}")
+                frame.to_csv(output, index=False, header=index == 0, columns=columns)
+        temporary.replace(destination)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+    LOGGER.info("Combined %d station files into %s", len(keys), destination)
     return destination
 
 
@@ -169,8 +206,11 @@ def check_gcs_connection() -> bool:
         env = load_env()
         bucket = env.get("GCS_BUCKET") or os.getenv("GCS_BUCKET")
         client = _s3_client(env)
-        client.head_object(Bucket=bucket, Key=config.GCS_MASTER_OBJECT)
-        LOGGER.info("GCS connection OK: gs://%s/%s", bucket, config.GCS_MASTER_OBJECT)
+        if not bucket:
+            raise RuntimeError("GCS_BUCKET is not set in .env")
+        keys = _station_objects(client, bucket)
+        client.head_object(Bucket=bucket, Key=keys[0])
+        LOGGER.info("GCS connection OK: %d station datasets under gs://%s/%s", len(keys), bucket, config.GCS_DATA_PREFIX)
         return True
     except Exception as error:  # noqa: BLE001 - report and continue
         LOGGER.warning("GCS connection check failed: %s", error)

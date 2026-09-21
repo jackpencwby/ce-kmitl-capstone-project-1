@@ -78,10 +78,14 @@ AWS_SECRET_ACCESS_KEY  HMAC secret
 GCS_BUCKET             kmitl-capstone-project-data-bucket
 ```
 
-The master preprocessed table is expected at
-`gs://<GCS_BUCKET>/clean-data/preprocess/all_stations_daily.csv`, mirroring
-`clean-data_preprocess_all_stations_daily.csv` in the repo root. Runs prefer
-the local copy; `--source gcs` re-downloads it.
+The dataset is read from
+`gs://<GCS_BUCKET>/clean-data/preprocess-09-19/<station>/daily_dataset.csv`,
+for example `1003_Nakhon Nayok Weather Observing Station/daily_dataset.csv`.
+`--source gcs` discovers all station folders and combines their daily CSVs
+into `clean-data_preprocess-09-19_all_stations_daily.csv` in the repo root.
+Summary files and combined exports in the bucket are excluded to avoid
+duplicate rows. A failed download leaves the previous local cache intact.
+Runs prefer this local copy by default; `--source local` requires it.
 
 ## Frozen rules (do not change per experiment)
 
@@ -103,7 +107,18 @@ Built causally in `common/features.py` (plan section 3.1, no look-ahead):
 - Same-day weather (temperature, humidity, pressure, wind speed, wind
   direction sin/cos, rainfall) and fire/hotspot activity
 - Calendar cyclical features (known future)
+- Same-day CO mean, CO 8-hour maximum (`ug/m3`), and AOD at 500 nm:
+  `co_mean_ugm3`, `co_8h_max_ugm3`, `aod500_mean`. Each has a `_missing`
+  indicator; missing measurements use a zero placeholder. This keeps rows
+  with missing CO/AOD usable for every algorithm without future-value filling.
 - Spatial neighbor PM2.5 aggregates (E4 only), always lagged 1/3/7 days
+
+All experiments share the expanded 33-feature baseline. Source CO/AOD columns
+must exist; older exports without them fail validation. The original
+`example_dataset_1_station.csv` is a legacy schema example; use the new
+root CSV and its `clean-data_preprocess-09-19_*` metadata for current runs.
+Re-run comparisons together: results from the old dataset/baseline are not
+directly comparable. Split dates and forecast horizons remain unchanged.
 
 ## Artifacts
 
@@ -120,7 +135,7 @@ and GPU model are recorded in `config.json` (plan section 16).
 ```powershell
 .venv/Scripts/python.exe -m pip install -r experiment-stage-1/requirements.txt
 
-# Unit tests for the spatial wind/distance helpers (plan section 9).
+# Unit tests for dataset loading, CO/AOD inputs, and spatial helpers.
 .venv/Scripts/python.exe -m unittest discover -s experiment-stage-1/tests -v
 ```
 

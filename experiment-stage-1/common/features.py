@@ -65,13 +65,14 @@ def add_pm25_lag_roll(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def ensure_baseline_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Make sure every baseline feature column exists (fills absent as NaN).
+    """Make sure every source baseline feature column exists.
 
     Weather/fire/calendar features already exist in the master table; this is
     a guard so an experiment fails loudly rather than silently dropping a
     feature that was renamed upstream.
     """
-    needed = set(config.WEATHER_FEATURES) | set(config.FIRE_FEATURES) | set(config.CALENDAR_FEATURES)
+    needed = (set(config.WEATHER_FEATURES) | set(config.FIRE_FEATURES)
+              | set(config.CALENDAR_FEATURES) | set(config.AIR_QUALITY_FEATURES))
     missing = [c for c in needed if c not in df.columns]
     if missing:
         raise KeyError(f"Master table is missing expected feature columns: {missing}")
@@ -81,6 +82,12 @@ def ensure_baseline_columns(df: pd.DataFrame) -> pd.DataFrame:
 def build_base_features(df: pd.DataFrame) -> pd.DataFrame:
     """Full non-spatial baseline: targets + pm25 lag/roll + guard checks."""
     df = ensure_baseline_columns(df)
+    df = df.copy()
+    for col in config.AIR_QUALITY_FEATURES:
+        # A constant placeholder plus a flag preserves sparse satellite rows
+        # without learning from validation/test or using future observations.
+        df[f"{col}_missing"] = df[col].isna().astype("int8")
+        df[col] = df[col].fillna(0.0)
     df = add_pm25_lag_roll(df)
     df = add_targets(df)
     return df
