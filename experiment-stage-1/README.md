@@ -10,7 +10,7 @@ run uses identical, frozen rules and only the one factor under test changes.
 
 | Script | Plan | What varies | Fixed axes |
 |---|---|---|---|
-| `E1_1.py` | E1.1 | Training = **Local** (one model set per station) — Stage 1 baseline | XGB / Direct / No neighbor |
+| `E1_1.py` | E1.1 | Training = **Local** (one model per station and horizon) | XGB / Direct / No neighbor |
 | `E1_2.py` | E1.2 | Training = **Global** (all stations pooled + station_id) | XGB / Direct / No neighbor |
 | `E1_3.py` | E1.3 | Training = **Global + local tree residual** (OOF residuals) | XGB / Direct / No neighbor |
 | `E1_4.py` | E1.4 | Training = **Regional** (North/NE/Central/South by province) | XGB / Direct / No neighbor |
@@ -19,7 +19,7 @@ run uses identical, frozen rules and only the one factor under test changes.
 | `E2_2.py` | E2.2 | Algorithm = **LightGBM** (GPU build if available, else CPU) | Local / Direct / No neighbor |
 | `E2_3.py` | E2.3 | Algorithm = **GradientBoostingRegressor** (CPU only) | Local / Direct / No neighbor |
 | `E3_1.py` | E3.1 | Forecast = **Direct** (7 models, one per horizon) | Local / XGB / No neighbor |
-| `E3_2.py` | E3.2 | Forecast = **Multi-output** (`MultiOutputRegressor`) | Local / XGB / No neighbor |
+| `E3_2.py` | E3.2 | Forecast = **Multi-output** (independent estimators on common complete-case rows) | Local / XGB / No neighbor |
 | `E4_1.py` | E4.1 | Spatial = **No neighbor** | Local / XGB / Direct |
 | `E4_2.py` | E4.2 | Spatial = **Unweighted neighbor** mean | Local / XGB / Direct |
 | `E4_3.py` | E4.3 | Spatial = **Distance-weighted** (1/(d+ε)) | Local / XGB / Direct |
@@ -31,6 +31,8 @@ run uses identical, frozen rules and only the one factor under test changes.
 --train                    Actually fit models and write artifacts.
                            Without it, the script does a DRY RUN (prints the
                            resolved configuration, station list and split).
+                           A training run evaluates validation and test
+                           separately and saves the models used for each.
 --stations S [S ...]       Station id(s) to train/score, or 'all' (default).
                            e.g. --stations 72 36 108
                            Ineligible (weather-only) ids are dropped with a
@@ -41,13 +43,17 @@ run uses identical, frozen rules and only the one factor under test changes.
 --check-gcs                Verify the GCP connection from .env, then continue.
 --max-stations N           Cap the number of stations (quick smoke tests).
 --prefer-cpu               Force CPU even when a CUDA GPU is available.
+--upload-gcs               Upload the completed artifact folder to GCS (requires --train).
+--gcs-artifacts-prefix P   Override the bucket folder used by --upload-gcs.
+--keep-local               Keep the local artifacts after upload (default).
+--no-keep-local            Delete local artifacts after a successful upload.
 --log-level LEVEL          DEBUG / INFO / WARNING.
 ```
 
 ### Examples
 
 ```powershell
-# From the repository root, using the CUDA-enabled venv.
+# From the repository root, using the project's venv.
 
 # Dry run: see the config + which stations are eligible.
 .venv/Scripts/python.exe experiment-stage-1/E1_1.py
@@ -96,7 +102,8 @@ Set once in `common/config.py` (plan section 3):
 - Horizons `t+1 … t+7`
 - 4 expanding walk-forward folds with a 7-day embargo
 - Weather-only stations (pm25 missing > 30% in training) are dropped as targets
-- Fixed reasonable hyperparameters (no Optuna in Stage 1)
+- XGBoost parameters selected per horizon from `best_params_t1.json` through `best_params_t7.json` (no search during Stage 1 runs)
+- LightGBM and GradientBoostingRegressor keep their own fixed parameters in `common/config.py`
 - Metrics: MAE, MSE, RMSE, R², Bias; primary = macro RMSE over station × horizon
 
 ## Feature baseline
@@ -120,6 +127,29 @@ root CSV and its `clean-data_preprocess-09-19_*` metadata for current runs.
 Re-run comparisons together: results from the old dataset/baseline are not
 directly comparable. Split dates and forecast horizons remain unchanged.
 
+Every XGBoost experiment in E1–E4 uses `params` and
+`full_model_params.n_estimators` from `best_params_t{h}.json` for horizon `h`.
+The files currently specify a 2,000-tree ceiling. E1.1 fits one model per
+station and horizon, using
+100-round early stopping on validation. No parameter search runs during an
+experiment. The historical `best_iteration` and `prediction_trees` in the
+source files describe the earlier tuning runs; each new E1 fit selects its
+own best iteration.
+Targets are looked up on the exact future date in the same station segment.
+The selected validation model is reused for test; test targets never enter
+early stopping. Its saved model manifest includes `best_iteration` and a
+training-history CSV for each station and horizon.
+E1.2–E1.5 use the same per-horizon XGBoost parameters and validation early
+stopping
+for their main global or regional models. The E1.3 tree residual correctors
+use the same per-horizon XGBoost parameters on out-of-fold residuals; auxiliary
+out-of-fold fits use the tail of their own training window for early stopping,
+with a horizon-length target cutoff. All E1 test predictions reuse the models
+selected before test, including any local residual correctors.
+E2–E4 XGBoost runs use the same per-horizon parameters without early stopping.
+Their test models are fitted again on train plus validation data. E3.2 fits
+independent horizon estimators on rows with all seven targets available.
+
 ## Artifacts
 
 Each `--train` run writes `artifacts/<run_id>__<timestamp>/` with
@@ -129,6 +159,38 @@ Each `--train` run writes `artifacts/<run_id>__<timestamp>/` with
 `predictions_validation.parquet` (CSV fallback), `feature_list.txt`,
 `feature_importance.csv`, and `training_log.txt`. Device, library versions
 and GPU model are recorded in `config.json` (plan section 16).
+For XGBoost, `config.json` records `params_by_horizon` and `params_source`;
+`fixed_params` contains the t+1 recipe for compatibility with older readers.
+The same metrics and prediction files are also written with a `_test` suffix
+for the test period. `metrics_by_station_test.csv` contains each station's
+MAE, MSE, RMSE, R² and bias across horizons; `metrics_overall_test.json`
+contains pooled (micro) and station-equal (macro) metrics. Fitted estimators
+are in `model/validation/` and `model/test/`, each with a `manifest.json`.
+For E1, the test manifest points to the validation-selected models; no second
+fit is made. For E2–E4, the test fit uses train plus validation origins, but
+excludes any training target whose forecast date reaches the test period.
+The validation fit uses only training origins with labels available before
+validation starts.
+
+For E1.1–E1.5, the runner also writes the notebook-compatible tree:
+`horizon_01/` through `horizon_07/` with `validation/predictions.csv`,
+`validation/metrics.csv`, `test/predictions.csv`, `test/metrics.csv`,
+`test/<station_id>/predictions.csv`, `test/<station_id>/metrics.csv`, plots,
+`station_summary.csv`, `best_params.json`, `tuning_results.csv`,
+`training_history.csv`, `training_curve.png`, `feature_importance.csv`, and
+`model_manifest.json`. The run root gets `horizon_summary.csv`,
+`all_station_summary.csv`, `run_config.json`, `split_summary.csv`,
+`target_audit.csv`, `feature_missingness.csv`, `horizon_comparison.png`,
+and `completion.json`. CSV prediction and metric column names follow
+`xgboost_1to7_tuned.ipynb`; persistence comparisons use only paired rows.
+All E1 targets are looked up on the exact future date within the same station
+segment, matching the notebook's target audit.
+`model.ubj` is present only when a horizon truly has one pooled XGBoost
+model (E1.2). Other E1 strategies use the manifest for their multiple models.
+The `tuning_results.csv` records the selected per-horizon configuration as
+`selection_method=fixed_no_search`; it does not imply a parameter search.
+Where a strategy has no per-iteration validation history, `training_history.csv`
+has only headers and `training_curve.png` states that no history was recorded.
 
 ## Install & test
 
@@ -146,7 +208,7 @@ and GPU model are recorded in `config.json` (plan section 16).
 - LightGBM GPU is used only when the installed build supports it; otherwise it
   falls back to CPU automatically (accuracy is comparable; do not compare CPU
   vs GPU timing directly, plan section 3.3).
-- Global/local residual models (E1.3, E1.5) use **out-of-fold** global
-  predictions for the training residuals; the MLP's scaler is fit on training
+- Global/local residual models (E1.3, E1.5) use expanding **out-of-fold** global
+  predictions within the fit period for training residuals; the MLP's scaler is fit on training
   rows only, with early stopping and a per-station fallback to residual = 0
   when a station has too few rows.

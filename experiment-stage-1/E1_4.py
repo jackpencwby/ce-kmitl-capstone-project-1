@@ -33,6 +33,7 @@ def main() -> int:
         spatial_mode="none",
         include_station_id=True,    # regional model keeps station_id ...
         include_region_id=True,     # ... and region_id (plan section 3.2)
+        baseline_xgb=True,
     )
     return runner.execute(spec, args)
 

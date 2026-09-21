@@ -50,7 +50,7 @@
 
 | Flag | ความหมาย |
 |---|---|
-| `--train` | **สั่งเทรนจริง** และบันทึก artifacts ถ้าไม่ใส่ = dry run (แค่พิมพ์ config + รายชื่อสถานี) |
+| `--train` | **สั่งเทรนจริง** ประเมิน validation และ test แยกกัน พร้อมบันทึกโมเดลและ artifacts; ถ้าไม่ใส่ = dry run |
 | `--stations 72 36 ...` | เลือกสถานีที่จะเทรน/วัดผล ใส่ได้หลายตัว |
 | `--stations all` | ใช้ทุกสถานีที่มีข้อมูล PM2.5 พอ (ค่าเริ่มต้น) |
 | `--source auto` | อ่านไฟล์ local ถ้ามี ไม่มีค่อยโหลดจาก GCS (ค่าเริ่มต้น) |
@@ -98,7 +98,7 @@
 ```powershell
 .venv/Scripts/python.exe experiment-stage-1/E1_1.py --stations 72
 ```
-
+โ
 จะพิมพ์ config, จำนวนสถานีที่เลือก, จำนวนแถว train/validation/test และจำนวน feature
 โดย **ยังไม่เทรน** เหมาะกับการเช็คว่าตั้งค่าถูกก่อนรันจริง
 
@@ -189,6 +189,33 @@ baseline ใหม่มี 33 features จึงควรรันทุก exp
 | `feature_importance.csv` | ความสำคัญของ feature |
 | `training_log.txt` | log สรุปของ run |
 
+ทุก experiment ที่ใช้ XGBoost อ่านพารามิเตอร์แยกตาม horizon จาก
+`best_params_t1.json` ถึง `best_params_t7.json` ใน `experiment-stage-1`
+(ไม่สุ่มค้นหา hyperparameter ระหว่างการรัน) ส่วน LightGBM/GBR ใช้พารามิเตอร์ของตนเอง
+โมเดล XGBoost หลักฝึกได้สูงสุด 2,000 trees พร้อม early stopping 100 รอบ
+จาก validation แล้วใช้โมเดลที่เลือกไว้ประเมิน test โดยไม่ใช้ test เลือกพารามิเตอร์
+E1.1 ยังคงฝึกแยกรายสถานี × horizon ส่วน E1.2–E1.5 คงรูปแบบ global/regional/
+local residual ของแต่ละ experiment ไฟล์ manifest มี `best_iteration`
+และประวัติ RMSE รายรอบฝึกเมื่อมี early stopping
+
+ไฟล์ผล test ใช้ชื่อ `metrics_overall_test.json`, `metrics_by_horizon_test.csv`,
+`metrics_by_station_test.csv`, `metrics_station_horizon_test.csv` และ
+`predictions_test.parquet` (หรือ `.csv`) โดย `metrics_by_station_test.csv`
+สรุป MAE, MSE, RMSE, R² และ bias ของแต่ละสถานี ส่วน
+`metrics_overall_test.json` มีผลรวมทุกสถานีแบบ micro และ macro
+โมเดลอยู่ใน `model/validation/` และ `model/test/` พร้อม `manifest.json`
+ที่ระบุไฟล์ของแต่ละสถานีและ horizon
+
+สำหรับ E1.1–E1.5 จะมีรูปแบบผลตาม `xgboost_1to7_tuned.ipynb` เพิ่มอีกชุด:
+`horizon_01/` ถึง `horizon_07/` ภายในแต่ละ horizon มีผล validation/test,
+ผลรายสถานีใน `test/<station_id>/`, กราฟ และ `model_manifest.json`
+ระดับ run มี `horizon_summary.csv`, `all_station_summary.csv`,
+`split_summary.csv`, `run_config.json`, `target_audit.csv`,
+`feature_missingness.csv`, `horizon_comparison.png` และ `completion.json`
+ชื่อคอลัมน์ metric และการเทียบ persistence ใช้กติกาเดียวกับ notebook
+สำหรับ E1.1/E1.3–E1.5 ที่มีหลายโมเดลต่อ horizon ให้ดู `model_manifest.json`
+ส่วน `model.ubj` มีเฉพาะ E1.2 ที่มี pooled XGBoost ตัวเดียวต่อ horizon
+
 ### การอ่านผลบนหน้าจอ
 
 หลังเทรนเสร็จ จะพิมพ์สรุปสั้น ๆ เช่น:
@@ -255,7 +282,8 @@ $stations = "72","36","108"
 จากนั้นเทียบค่า `Primary macro RMSE` ของแต่ละ run เพื่อคัดตัวเลือกที่ดีเข้าสู่ Stage 2
 
 > **หมายเหตุ:** Stage 1 ใช้ "คัดตัวเลือก" ไม่ใช่ประกาศผู้ชนะสุดท้าย และ
-> **ห้ามแตะชุด Test** จนกว่าจะเลือก final configuration เสร็จ (ตามแผนข้อ 3, 5)
+> การรัน `--train` จะประเมินชุด test ของทุก experiment ตาม workflow ปัจจุบัน
+> จึงควรเลือกกลยุทธ์จาก validation ก่อน และไม่ใช้ผล test เพื่อปรับ hyperparameter
 
 ---
 

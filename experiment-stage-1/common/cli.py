@@ -22,8 +22,8 @@ def base_parser(description: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--train", action="store_true",
-        help="Run training. Without this flag the script only describes the "
-             "configuration and resolved stations (a dry run).",
+        help="Fit models, save them, and report validation and test separately. "
+             "Without this flag only describe the configuration (dry run).",
     )
     parser.add_argument(
         "--stations", nargs="+", default=["all"],

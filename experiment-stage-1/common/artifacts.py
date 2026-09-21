@@ -12,6 +12,7 @@ import logging
 import platform
 import subprocess
 import sys
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -100,6 +101,11 @@ def write_json(path: Path, obj: dict) -> None:
 
 
 def dataset_manifest(df: pd.DataFrame, stations: list) -> dict:
+    train = df[(df[config.DATE_COL] < pd.Timestamp(config.VALIDATION_START))
+               & df[config.STATION_ID_COL].isin(stations)]
+    station_codes = {str(s): i for i, s in enumerate(sorted(train[config.STATION_ID_COL].unique()))}
+    region_codes = ({str(r): i for i, r in enumerate(sorted(train["region_id"].dropna().unique()))}
+                    if "region_id" in train.columns else {})
     return {
         "master_local_path": str(config.LOCAL_MASTER_CSV),
         "dataset_gcs_prefix": config.GCS_DATA_PREFIX,
@@ -112,6 +118,8 @@ def dataset_manifest(df: pd.DataFrame, stations: list) -> dict:
         "n_stations_total": int(df[config.STATION_ID_COL].nunique()),
         "n_stations_used": len(stations),
         "stations_used": [str(s) for s in stations],
+        "station_code_map": station_codes,
+        "region_code_map": region_codes,
         "git_commit": _git_commit(),
     }
 
@@ -128,6 +136,8 @@ def save_run(
     feature_list: list[str],
     feature_importance: Optional[pd.DataFrame] = None,
     training_log: str = "",
+    split: str = "validation",
+    model_records: Optional[list] = None,
 ) -> None:
     """Persist the full artifact set for one run."""
     device = detect_device()
@@ -135,26 +145,75 @@ def save_run(
                    "seed": config.SEED,
                    "validation_start": config.VALIDATION_START,
                    "test_start": config.TEST_START,
+                   "evaluation_splits": ["validation", "test"],
                    "forecast_horizons": list(config.FORECAST_HORIZONS)}
     write_json(run_dir / "config.json", full_config)
     write_json(run_dir / "dataset_manifest.json", dataset_manifest(df, stations))
     folds_manifest.to_csv(run_dir / "fold_manifest.csv", index=False)
 
-    write_json(run_dir / "metrics_overall.json", reports["overall"])
-    reports["by_horizon"].to_csv(run_dir / "metrics_by_horizon.csv", index=False)
-    reports["by_station"].to_csv(run_dir / "metrics_by_station.csv", index=False)
-    reports["station_horizon"].to_csv(run_dir / "metrics_station_horizon.csv", index=False)
+    suffix = "" if split == "validation" else f"_{split}"
+    write_json(run_dir / f"metrics_overall{suffix}.json", reports["overall"])
+    reports["by_horizon"].to_csv(run_dir / f"metrics_by_horizon{suffix}.csv", index=False)
+    reports["by_station"].to_csv(run_dir / f"metrics_by_station{suffix}.csv", index=False)
+    reports["station_horizon"].to_csv(run_dir / f"metrics_station_horizon{suffix}.csv", index=False)
 
     # Predictions: parquet if pyarrow available, else CSV.
-    pred_path = run_dir / "predictions_validation.parquet"
+    pred_path = run_dir / f"predictions_{split}.parquet"
     try:
         predictions.to_parquet(pred_path, index=False)
     except Exception:  # noqa: BLE001
-        pred_path = run_dir / "predictions_validation.csv"
+        pred_path = run_dir / f"predictions_{split}.csv"
         predictions.to_csv(pred_path, index=False)
 
     (run_dir / "feature_list.txt").write_text("\n".join(feature_list), encoding="utf-8")
     if feature_importance is not None and len(feature_importance):
-        feature_importance.to_csv(run_dir / "feature_importance.csv", index=False)
-    (run_dir / "training_log.txt").write_text(training_log, encoding="utf-8")
+        feature_importance.to_csv(run_dir / f"feature_importance{suffix}.csv", index=False)
+    if split == "validation":
+        (run_dir / "training_log.txt").write_text(training_log, encoding="utf-8")
+    save_models(run_dir, model_records or [], split, feature_list)
     LOGGER.info("Saved artifacts to %s", run_dir)
+
+
+def save_models(run_dir: Path, records: list, split: str,
+                feature_list: list[str]) -> None:
+    """Save fitted estimators and the information needed to identify them."""
+    import joblib
+
+    model_dir = run_dir / "model" / split
+    model_dir.mkdir(parents=True, exist_ok=True)
+    manifest = []
+    for rec in records:
+        group = re.sub(r"[^A-Za-z0-9_.-]", "_", rec["group"])
+        stem = f"{rec['role']}__{group}__h{rec['horizon']}"
+        estimator = rec["estimator"]
+        if rec["role"] == "local_residual_mlp":
+            import torch
+            path = model_dir / f"{stem}.pt"
+            torch.save({"state_dict": estimator.state_dict(),
+                        "mean": rec["mean"], "std": rec["std"],
+                        "feature_columns": rec["feature_columns"],
+                        "input_dim": len(rec["feature_columns"]),
+                        "hidden_units": list(config.MLP_PARAMS.hidden_units),
+                        "dropout": config.MLP_PARAMS.dropout}, path)
+        elif hasattr(estimator, "get_booster"):
+            path = model_dir / f"{stem}.json"
+            estimator.save_model(path)
+        else:
+            path = model_dir / f"{stem}.joblib"
+            joblib.dump(estimator, path)
+        item = {"role": rec["role"], "group": rec["group"],
+                "horizon": rec["horizon"], "file": path.name,
+                "feature_columns": rec.get("feature_columns", feature_list)}
+        if hasattr(estimator, "get_params"):
+            item["full_model_params"] = estimator.get_params()
+        if hasattr(estimator, "best_iteration"):
+            item["best_iteration"] = int(estimator.best_iteration)
+            history = estimator.evals_result()
+            if history:
+                history_path = model_dir / f"{stem}__training_history.csv"
+                pd.DataFrame({"train_rmse": history["validation_0"]["rmse"],
+                              "validation_rmse": history["validation_1"]["rmse"]}).to_csv(
+                                  history_path, index_label="iteration")
+                item["training_history_file"] = history_path.name
+        manifest.append(item)
+    write_json(model_dir / "manifest.json", {"split": split, "models": manifest})

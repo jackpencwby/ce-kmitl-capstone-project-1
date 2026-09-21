@@ -9,6 +9,7 @@ different split date, change it here once, not inside an experiment script.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
 from typing import Final
 
@@ -145,38 +146,6 @@ REGION_BY_PROVINCE: Final[dict[str, str]] = {}  # populated in features.assign_r
 
 
 @dataclass
-class FixedXGBParams:
-    """Fixed reasonable defaults for Stage 1 screening (plan section 5, 11.1).
-
-    Not tuned in Stage 1. GPU is used when available; callers fall back to
-    CPU without changing anything else.
-    """
-
-    n_estimators: int = 600
-    learning_rate: float = 0.05
-    max_depth: int = 6
-    min_child_weight: float = 5.0
-    subsample: float = 0.8
-    colsample_bytree: float = 0.8
-    gamma: float = 0.0
-    reg_alpha: float = 0.0
-    reg_lambda: float = 1.0
-
-    def as_dict(self) -> dict:
-        return {
-            "n_estimators": self.n_estimators,
-            "learning_rate": self.learning_rate,
-            "max_depth": self.max_depth,
-            "min_child_weight": self.min_child_weight,
-            "subsample": self.subsample,
-            "colsample_bytree": self.colsample_bytree,
-            "gamma": self.gamma,
-            "reg_alpha": self.reg_alpha,
-            "reg_lambda": self.reg_lambda,
-        }
-
-
-@dataclass
 class FixedLGBMParams:
     """Fixed reasonable defaults for LightGBM (plan section 11.2)."""
 
@@ -242,7 +211,21 @@ class FixedMLPParams:
     min_station_rows: int = 120  # fallback to residual=0 below this
 
 
-XGB_PARAMS: Final[FixedXGBParams] = FixedXGBParams()
+BASELINE_EARLY_STOPPING_ROUNDS: Final[int] = 100
+
+
+def xgb_params_for_horizon(horizon: int) -> dict:
+    """Load the selected XGBoost recipe for a forecast horizon."""
+    if horizon not in FORECAST_HORIZONS:
+        raise ValueError(f"Unsupported forecast horizon: {horizon}")
+    path = STAGE1_DIR / f"best_params_t{horizon}.json"
+    recipe = json.loads(path.read_text(encoding="utf-8"))
+    params = recipe["params"]
+    expected = {"subsample", "reg_lambda", "reg_alpha", "min_child_weight",
+                "max_depth", "learning_rate", "gamma", "colsample_bytree"}
+    if set(params) != expected:
+        raise ValueError(f"Unexpected XGBoost parameters in {path}: {set(params) ^ expected}")
+    return {"n_estimators": int(recipe["full_model_params"]["n_estimators"]), **params}
 LGBM_PARAMS: Final[FixedLGBMParams] = FixedLGBMParams()
 GBR_PARAMS: Final[FixedGBRParams] = FixedGBRParams()
 MLP_PARAMS: Final[FixedMLPParams] = FixedMLPParams()

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
@@ -30,12 +31,17 @@ from . import config, features, metrics, splits
 LOGGER = logging.getLogger(__name__)
 
 
+def _record(records, estimator, group, horizon, role="main"):
+    records.append({"estimator": estimator, "group": str(group),
+                    "horizon": int(horizon), "role": role})
+
+
 # ---------------------------------------------------------------------------
 # Estimator factories (fixed reasonable defaults, plan section 5 & 11)
 # ---------------------------------------------------------------------------
-def make_xgb(prefer_gpu: bool = True):
+def make_xgb(prefer_gpu: bool = True, horizon: int = 1):
     import xgboost as xgb
-    params = config.XGB_PARAMS.as_dict()
+    params = config.xgb_params_for_horizon(horizon)
     device = "cpu"
     tree_method = "hist"
     if prefer_gpu:
@@ -53,6 +59,24 @@ def make_xgb(prefer_gpu: bool = True):
         n_jobs=0,
         **params,
     )
+
+
+def make_baseline_xgb(prefer_gpu: bool = True, horizon: int = 1):
+    """XGBoost recipe selected for the given horizon, with early stopping."""
+    import xgboost as xgb
+    device = make_xgb(prefer_gpu).get_params()["device"]
+    return xgb.XGBRegressor(
+        objective="reg:squarederror", eval_metric="rmse", tree_method="hist",
+        device=device, random_state=config.SEED, n_jobs=4,
+        early_stopping_rounds=config.BASELINE_EARLY_STOPPING_ROUNDS,
+        **config.xgb_params_for_horizon(horizon),
+    )
+
+
+def _horizon_factory(factory: Callable, horizon: int) -> Callable:
+    if factory in (make_xgb, make_baseline_xgb):
+        return partial(factory, horizon=horizon)
+    return factory
 
 
 _LGBM_GPU_SUPPORTED: Optional[bool] = None
@@ -127,6 +151,7 @@ class RunSpec:
     prefer_gpu: bool = True
     include_station_id: bool = False    # global/regional add station_id feature
     include_region_id: bool = False     # regional adds region_id feature
+    baseline_xgb: bool = False          # E1 shared XGBoost recipe + early stopping
 
 
 # ---------------------------------------------------------------------------
@@ -143,10 +168,38 @@ def _fit_predict_estimator(
     factory: Callable, prefer_gpu: bool,
     X_tr: pd.DataFrame, y_tr: pd.Series,
     X_val: pd.DataFrame,
+    y_val: pd.Series | None = None,
+    train_dates: pd.Series | None = None,
+    horizon: int = 0,
 ) -> tuple[np.ndarray, object]:
     """Fit a fresh estimator on training rows, predict validation rows."""
     est = factory(prefer_gpu=prefer_gpu)
-    est.fit(X_tr, y_tr)
+    if y_val is None:
+        if getattr(est, "early_stopping_rounds", None):
+            used_internal_eval = False
+            if train_dates is not None:
+                dates = pd.to_datetime(train_dates)
+                cutoff = dates.quantile(0.85)
+                fit_mask = dates + pd.Timedelta(days=horizon) < cutoff
+                eval_mask = dates >= cutoff
+                if fit_mask.sum() >= 50 and eval_mask.sum() >= 10:
+                    est.fit(X_tr.loc[fit_mask], y_tr.loc[fit_mask],
+                            eval_set=[(X_tr.loc[fit_mask], y_tr.loc[fit_mask]),
+                                      (X_tr.loc[eval_mask], y_tr.loc[eval_mask])],
+                            verbose=False)
+                    used_internal_eval = True
+            if not used_internal_eval:
+                est.set_params(early_stopping_rounds=None)
+                est.fit(X_tr, y_tr)
+        else:
+            est.fit(X_tr, y_tr)
+    else:
+        valid = y_val.notna()
+        if not valid.any():
+            raise ValueError("Early stopping requires validation targets")
+        est.fit(X_tr, y_tr, eval_set=[(X_tr, y_tr),
+                                     (X_val.loc[valid], y_val.loc[valid])],
+                verbose=False)
     return est.predict(X_val), est
 
 
@@ -164,6 +217,8 @@ def _fit_partition(
     spec: RunSpec, factory: Callable,
     train_df: pd.DataFrame, val_df: pd.DataFrame,
     feature_cols: list[str],
+    model_records: list | None = None,
+    group: str = "global",
 ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
     """Fit and predict for one train/val partition.
 
@@ -179,24 +234,28 @@ def _fit_partition(
         # Rows must have all 7 targets present for training (plan 2.1, 8).
         tr = train_df.dropna(subset=feature_cols + tcols)
         va = val_df.dropna(subset=feature_cols)
+        if len(va):
+            tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=max(config.FORECAST_HORIZONS))
+                    < va[config.DATE_COL].min()]
         if len(tr) == 0 or len(va) == 0:
             return pd.DataFrame(columns=id_cols + ["horizon", "y_true", "y_pred"]), importances
-        from sklearn.multioutput import MultiOutputRegressor
-        base = factory(prefer_gpu=spec.prefer_gpu)
-        model = MultiOutputRegressor(base)
-        model.fit(tr[feature_cols], tr[tcols])
-        yhat = np.asarray(model.predict(va[feature_cols]))
-        for j, h in enumerate(config.FORECAST_HORIZONS):
+        # MultiOutputRegressor fits independent target estimators. Fit them
+        # explicitly so each horizon receives its own selected parameters.
+        for h in config.FORECAST_HORIZONS:
+            hfactory = _horizon_factory(factory, h)
+            yhat, estimator = _fit_predict_estimator(
+                hfactory, spec.prefer_gpu, tr[feature_cols], tr[f"target_t{h}"],
+                va[feature_cols],
+                va[f"target_t{h}"] if spec.baseline_xgb else None,
+            )
+            if model_records is not None:
+                _record(model_records, estimator, group, h)
             block = va[id_cols].copy()
             block["horizon"] = h
             block["y_true"] = va[f"target_t{h}"].to_numpy()
-            block["y_pred"] = yhat[:, j]
+            block["y_pred"] = yhat
             preds.append(block)
-        # Importance from the first sub-estimator (representative).
-        try:
-            importances.append(_importance_frame(model.estimators_[0], feature_cols, "multi_h1"))
-        except Exception:  # noqa: BLE001
-            pass
+            importances.append(_importance_frame(estimator, feature_cols, f"multi_h{h}"))
         return pd.concat(preds, ignore_index=True), importances
 
     # Direct: one estimator per horizon.
@@ -204,11 +263,17 @@ def _fit_partition(
         tcol = f"target_t{h}"
         tr = train_df.dropna(subset=feature_cols + [tcol])
         va = val_df.dropna(subset=feature_cols)
-        if len(tr) == 0 or len(va) == 0:
+        if len(va):
+            tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=h)
+                    < va[config.DATE_COL].min()]
+        if len(tr) == 0 or len(va) == 0 or (spec.baseline_xgb and not va[tcol].notna().any()):
             continue
         yhat, est = _fit_predict_estimator(
-            factory, spec.prefer_gpu, tr[feature_cols], tr[tcol], va[feature_cols]
+            _horizon_factory(factory, h), spec.prefer_gpu, tr[feature_cols], tr[tcol], va[feature_cols],
+            va[tcol] if spec.baseline_xgb else None,
         )
+        if model_records is not None:
+            _record(model_records, est, group, h)
         block = va[id_cols].copy()
         block["horizon"] = h
         block["y_true"] = va[tcol].to_numpy()
@@ -248,18 +313,24 @@ def _add_categorical_codes(df: pd.DataFrame, spec: RunSpec, feature_cols: list[s
 # ---------------------------------------------------------------------------
 # Main holdout run (train window -> validation window)
 # ---------------------------------------------------------------------------
-def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list) -> dict:
+def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list,
+                evaluation: str = "validation") -> dict:
     """Fit on the training window and predict the validation holdout.
 
     Returns predictions, reports, feature importances, and the feature list.
     Dispatches on spec.training_strategy.
     """
-    factory = ESTIMATOR_FACTORIES[spec.algorithm]
+    factory = make_baseline_xgb if spec.baseline_xgb else ESTIMATOR_FACTORIES[spec.algorithm]
     feature_cols = assemble_feature_columns(spec)
     masks = splits.date_masks(df)
 
     df = df[df[config.STATION_ID_COL].isin(stations)].copy()
     masks = splits.date_masks(df)
+    if evaluation == "test":
+        masks["train"] = masks["train"] | masks["validation"]
+        masks["validation"] = masks["test"]
+    elif evaluation != "validation":
+        raise ValueError(f"Unknown evaluation split: {evaluation}")
 
     if spec.training_strategy == "local":
         return _run_local(spec, df, factory, feature_cols, masks)
@@ -270,13 +341,81 @@ def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list) -> dict:
     raise ValueError(f"Unknown training strategy: {spec.training_strategy}")
 
 
+def predict_local_test_from_validation_models(spec: RunSpec, df: pd.DataFrame,
+                                              records: list) -> dict:
+    """Backward-compatible E1.1 entry point for the shared E1 scorer."""
+    stations = sorted(df[config.STATION_ID_COL].unique())
+    return predict_e1_test_from_validation_models(spec, df, stations, records)
+
+
+def predict_e1_test_from_validation_models(spec: RunSpec, df: pd.DataFrame,
+                                           stations: list, records: list) -> dict:
+    """Score E1 test without fitting or selecting anything from test targets."""
+    if not spec.baseline_xgb:
+        raise ValueError("Validation-model reuse requires the shared E1 XGBoost recipe")
+    cols = assemble_feature_columns(spec)
+    chosen = df[df[config.STATION_ID_COL].isin(stations)].copy()
+    masks = splits.date_masks(chosen)
+    if spec.include_station_id or spec.include_region_id:
+        chosen, cols = _add_categorical_codes(chosen, spec, cols, masks["train"])
+    test = chosen[masks["test"]]
+    model_index = {(rec["role"], rec["group"], rec["horizon"]): rec
+                   for rec in records}
+    predictions = []
+    for h in config.FORECAST_HORIZONS:
+        if spec.training_strategy == "local":
+            groups = ((str(sid), part) for sid, part in test.groupby(config.STATION_ID_COL))
+        elif spec.training_strategy == "regional":
+            groups = ((str(region), part) for region, part in test.groupby("region_id"))
+        else:
+            groups = (("global", test),)
+        for group, part in groups:
+            rec = model_index.get(("main", group, h))
+            if rec is None:
+                continue
+            rows = part.dropna(subset=cols)
+            if rows.empty:
+                continue
+            global_prediction = np.asarray(rec["estimator"].predict(rows[cols]))
+            prediction = global_prediction.copy()
+            if spec.training_strategy in ("global_local_tree", "global_local_mlp"):
+                for sid, idx in rows.groupby(config.STATION_ID_COL).groups.items():
+                    local = model_index.get(("local_residual", str(sid), h))
+                    if local is None:
+                        local = model_index.get(("local_residual_mlp", str(sid), h))
+                    if local is None:
+                        continue
+                    positions = rows.index.get_indexer(idx)
+                    station_rows = rows.loc[idx]
+                    if local["role"] == "local_residual_mlp":
+                        import torch
+                        local_features = station_rows[cols].copy()
+                        local_features["global_pred"] = global_prediction[positions]
+                        X = local_features[local["feature_columns"]].to_numpy(dtype=np.float32)
+                        X = (X - local["mean"]) / local["std"]
+                        with torch.no_grad():
+                            correction = local["estimator"](
+                                torch.tensor(X, dtype=torch.float32)).numpy().reshape(-1)
+                    else:
+                        correction = local["estimator"].predict(station_rows[cols])
+                    prediction[positions] += correction
+            block = rows[[config.STATION_ID_COL, config.DATE_COL]].copy()
+            block["horizon"] = h
+            block["y_true"] = rows[f"target_t{h}"].to_numpy()
+            block["y_pred"] = prediction
+            predictions.append(block)
+    prediction = pd.concat(predictions, ignore_index=True) if predictions else pd.DataFrame()
+    return _finalize(spec, prediction, [], cols, [])
+
+
 def _run_local(spec, df, factory, feature_cols, masks) -> dict:
     """One independent model set per station (E1.1)."""
-    all_preds, all_imp = [], []
+    all_preds, all_imp, records = [], [], []
     for sid, sub in df.groupby(config.STATION_ID_COL):
         sub_masks = splits.date_masks(sub)
         tr, va = sub[sub_masks["train"]], sub[sub_masks["validation"]]
-        preds, imps = _fit_partition(spec, factory, tr, va, feature_cols)
+        preds, imps = _fit_partition(spec, factory, tr, va, feature_cols,
+                                     records, str(sid))
         all_preds.append(preds)
         for im in imps:
             if len(im):
@@ -284,13 +423,13 @@ def _run_local(spec, df, factory, feature_cols, masks) -> dict:
                 im[config.STATION_ID_COL] = sid
                 all_imp.append(im)
     predictions = pd.concat(all_preds, ignore_index=True) if all_preds else pd.DataFrame()
-    return _finalize(spec, predictions, all_imp, feature_cols)
+    return _finalize(spec, predictions, all_imp, feature_cols, records)
 
 
 def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
     """Global (all stations) or Regional (per region) pooled models."""
     df2, cols = _add_categorical_codes(df, spec, feature_cols, masks["train"])
-    all_preds, all_imp = [], []
+    all_preds, all_imp, records = [], [], []
 
     if spec.training_strategy == "global":
         groups = [("global", df2)]
@@ -300,7 +439,8 @@ def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
     for gname, gdf in groups:
         gmasks = splits.date_masks(gdf)
         tr, va = gdf[gmasks["train"]], gdf[gmasks["validation"]]
-        preds, imps = _fit_partition(spec, factory, tr, va, cols)
+        preds, imps = _fit_partition(spec, factory, tr, va, cols,
+                                     records, str(gname))
         all_preds.append(preds)
         for im in imps:
             if len(im):
@@ -308,7 +448,7 @@ def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
                 im["group"] = gname
                 all_imp.append(im)
     predictions = pd.concat(all_preds, ignore_index=True) if all_preds else pd.DataFrame()
-    return _finalize(spec, predictions, all_imp, cols)
+    return _finalize(spec, predictions, all_imp, cols, records)
 
 
 def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
@@ -322,27 +462,36 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
       5. validation prediction = global(val) + local_residual(val).
     """
     df2, gcols = _add_categorical_codes(df, spec, feature_cols, masks["train"])
-    folds = splits.walk_forward_folds(df2)
+    evaluation_start = df2.loc[masks["validation"], config.DATE_COL].min()
+    folds = splits.residual_oof_folds(df2, evaluation_start)
 
     # --- Global model, direct per-horizon (residual is defined per horizon) ---
     global_val_preds: dict[int, pd.DataFrame] = {}
     global_oof: dict[int, pd.DataFrame] = {}
-    all_imp = []
+    all_imp, records = [], []
 
     for h in config.FORECAST_HORIZONS:
         tcol = f"target_t{h}"
         train_rows = df2[masks["train"]].dropna(subset=gcols + [tcol])
         val_rows = df2[masks["validation"]].dropna(subset=gcols)
+        if len(val_rows):
+            train_rows = train_rows[
+                train_rows[config.DATE_COL] + pd.Timedelta(days=h)
+                < val_rows[config.DATE_COL].min()]
 
         # Global fit on full training window -> validation predictions.
-        if len(train_rows) and len(val_rows):
+        if len(train_rows) and len(val_rows) and (
+                not spec.baseline_xgb or val_rows[tcol].notna().any()):
             yhat, est = _fit_predict_estimator(
-                factory, spec.prefer_gpu, train_rows[gcols], train_rows[tcol], val_rows[gcols]
+                _horizon_factory(factory, h), spec.prefer_gpu, train_rows[gcols], train_rows[tcol], val_rows[gcols],
+                val_rows[tcol] if spec.baseline_xgb else None,
             )
             vp = val_rows[[config.STATION_ID_COL, config.DATE_COL]].copy()
             vp["global_pred"] = yhat
             vp["y_true"] = val_rows[tcol].to_numpy()
+            vp[gcols] = val_rows[gcols].to_numpy()
             global_val_preds[h] = vp
+            _record(records, est, "global", h)
             all_imp.append(_importance_frame(est, gcols, f"global_h{h}"))
 
         # Out-of-fold global predictions on training rows.
@@ -351,10 +500,13 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
             tmask, vmask = splits.fold_masks(df2, fold)
             ftr = df2[tmask].dropna(subset=gcols + [tcol])
             fva = df2[vmask].dropna(subset=gcols + [tcol])
+            ftr = ftr[ftr[config.DATE_COL] + pd.Timedelta(days=h)
+                      < fold.valid_start]
             if len(ftr) == 0 or len(fva) == 0:
                 continue
             yhat, _ = _fit_predict_estimator(
-                factory, spec.prefer_gpu, ftr[gcols], ftr[tcol], fva[gcols]
+                _horizon_factory(factory, h), spec.prefer_gpu, ftr[gcols], ftr[tcol], fva[gcols],
+                train_dates=ftr[config.DATE_COL], horizon=h,
             )
             part = fva[[config.STATION_ID_COL, config.DATE_COL]].copy()
             part["global_pred"] = yhat
@@ -374,16 +526,18 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
         oof = global_oof.get(h)
         residual_pred = np.zeros(len(vp))
         if oof is not None and len(oof):
-            residual_pred = corrector(spec, factory, oof, vp, gcols)
+            residual_pred = corrector(spec, _horizon_factory(factory, h), oof, vp, gcols,
+                                      records, h)
         vp["y_pred"] = vp["global_pred"].to_numpy() + residual_pred
         vp["horizon"] = h
         final_preds.append(vp[[config.STATION_ID_COL, config.DATE_COL, "horizon", "y_true", "y_pred"]])
 
     predictions = pd.concat(final_preds, ignore_index=True) if final_preds else pd.DataFrame()
-    return _finalize(spec, predictions, all_imp, gcols)
+    return _finalize(spec, predictions, all_imp, gcols, records)
 
 
-def _tree_corrector(spec, factory, oof, val_pred, gcols) -> np.ndarray:
+def _tree_corrector(spec, factory, oof, val_pred, gcols,
+                    records=None, horizon=0) -> np.ndarray:
     """Per-station tree residual model (E1.3). Falls back to 0 when sparse."""
     residual_pred = np.zeros(len(val_pred))
     oof = oof.copy()
@@ -396,13 +550,17 @@ def _tree_corrector(spec, factory, oof, val_pred, gcols) -> np.ndarray:
         va = val_pred.loc[vidx]
         if len(otr) < config.MLP_PARAMS.min_station_rows:
             continue  # fallback residual = 0
-        est = factory(prefer_gpu=spec.prefer_gpu)
-        est.fit(otr[gcols], otr["residual"])
-        residual_pred[val_pred.index.get_indexer(vidx)] = est.predict(va[gcols])
+        predicted, est = _fit_predict_estimator(
+            factory, spec.prefer_gpu, otr[gcols], otr["residual"], va[gcols],
+            train_dates=otr[config.DATE_COL], horizon=horizon)
+        if records is not None:
+            _record(records, est, sid, horizon, "local_residual")
+        residual_pred[val_pred.index.get_indexer(vidx)] = predicted
     return residual_pred
 
 
-def _mlp_corrector(spec, factory, oof, val_pred, gcols) -> np.ndarray:
+def _mlp_corrector(spec, factory, oof, val_pred, gcols,
+                   records=None, horizon=0) -> np.ndarray:
     """Per-station MLP residual model (E1.5) with train-only standardisation."""
     import torch
     from torch import nn
@@ -475,6 +633,10 @@ def _mlp_corrector(spec, factory, oof, val_pred, gcols) -> np.ndarray:
         model.eval()
         with torch.no_grad():
             rp = model(torch.tensor(Xva, device=device)).cpu().numpy().reshape(-1)
+        if records is not None:
+            records.append({"estimator": model.cpu(), "group": str(sid),
+                            "horizon": int(horizon), "role": "local_residual_mlp",
+                            "mean": mu, "std": sigma, "feature_columns": mlp_cols})
         residual_pred[val_pred.index.get_indexer(vidx)] = rp
     return residual_pred
 
@@ -494,7 +656,8 @@ def _build_mlp(in_dim: int, p: config.FixedMLPParams):
 # Walk-forward evaluation (fold-level primary metric) + finalisation
 # ---------------------------------------------------------------------------
 def _finalize(spec: RunSpec, predictions: pd.DataFrame,
-              importances: list[pd.DataFrame], feature_cols: list[str]) -> dict:
+              importances: list[pd.DataFrame], feature_cols: list[str],
+              model_records: list | None = None) -> dict:
     reports = metrics.build_reports(predictions) if len(predictions) else {
         "overall": {"micro": {}, "macro": {}},
         "by_horizon": pd.DataFrame(), "by_station": pd.DataFrame(),
@@ -506,4 +669,5 @@ def _finalize(spec: RunSpec, predictions: pd.DataFrame,
         "reports": reports,
         "importance": imp,
         "feature_list": feature_cols,
+        "model_records": model_records or [],
     }

@@ -33,6 +33,7 @@ def main() -> int:
         forecast_strategy="direct",
         spatial_mode="none",
         include_station_id=True,    # global model gets station_id as a feature
+        baseline_xgb=True,
     )
     return runner.execute(spec, args)
 

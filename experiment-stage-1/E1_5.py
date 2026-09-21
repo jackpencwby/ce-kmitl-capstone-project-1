@@ -35,6 +35,7 @@ def main() -> int:
         forecast_strategy="direct",
         spatial_mode="none",
         include_station_id=True,
+        baseline_xgb=True,
     )
     return runner.execute(spec, args)
 

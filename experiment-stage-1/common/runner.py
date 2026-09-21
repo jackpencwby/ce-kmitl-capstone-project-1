@@ -9,6 +9,7 @@ requested stations, runs the model, computes reports, and writes artifacts.
 from __future__ import annotations
 
 import logging
+import json
 import random
 import shutil
 from datetime import datetime, timezone
@@ -37,6 +38,8 @@ def prepare_dataframe(spec: models.RunSpec, source: str) -> pd.DataFrame:
     """Load the master table and build all features the spec needs."""
     df = data.load_master(source=source)
     df = features.build_base_features(df)
+    if spec.run_id.startswith("E1_"):
+        df = features.add_exact_day_targets(df)
     if spec.include_region_id or spec.training_strategy == "regional":
         df = features.assign_region(df)
     if spec.spatial_mode != "none":
@@ -129,11 +132,17 @@ def execute(spec: models.RunSpec, args) -> int:
         "include_region_id": spec.include_region_id,
         "elapsed_seconds": elapsed,
         "naive_primary_macro_rmse": naive_reports["overall"]["macro"].get("primary_macro_rmse"),
-        "fixed_params": {
-            "xgboost": config.XGB_PARAMS.as_dict(),
+        "fixed_params": ({"xgboost": config.xgb_params_for_horizon(1),
             "lightgbm": config.LGBM_PARAMS.as_dict(),
             "gbr": config.GBR_PARAMS.as_dict(),
-        }.get(spec.algorithm, {}),
+        }.get(spec.algorithm, {})),
+        "params_by_horizon": ({str(h): config.xgb_params_for_horizon(h)
+                               for h in config.FORECAST_HORIZONS}
+                              if spec.algorithm == "xgboost" else {}),
+        "params_source": ("best_params_t1.json ... best_params_t7.json"
+                          if spec.algorithm == "xgboost" else None),
+        "early_stopping_rounds": (config.BASELINE_EARLY_STOPPING_ROUNDS
+                                  if spec.baseline_xgb else None),
     }
     artifacts.save_run(
         run_dir=run_dir,
@@ -147,7 +156,53 @@ def execute(spec: models.RunSpec, args) -> int:
         feature_list=result["feature_list"],
         feature_importance=result["importance"],
         training_log=summary,
+        model_records=result["model_records"],
     )
+    # E1 uses validation for early stopping, so reuse the selected estimators
+    # on test. Other experiment families fit a separate train+validation model.
+    if spec.run_id.startswith("E1_") and spec.baseline_xgb:
+        test_result = models.predict_e1_test_from_validation_models(
+            spec, df, stations, result["model_records"])
+    else:
+        test_result = models.run_holdout(spec, df, stations, evaluation="test")
+    del result
+    test_reports = test_result["reports"]
+    test_rows = df[df[config.STATION_ID_COL].isin(stations)][masks["test"]]
+    naive_test = metrics.build_reports(metrics.persistence_prediction(test_rows))
+    test_macro = test_reports["overall"].get("macro", {})
+    print("\n=== Test results ===")
+    print(f"Primary macro RMSE (station x horizon): {test_macro.get('primary_macro_rmse')}")
+    print(f"Naive persistence primary macro RMSE  : "
+          f"{naive_test['overall']['macro'].get('primary_macro_rmse')}")
+    artifacts.save_run(
+        run_dir=run_dir, run_id=spec.run_id,
+        run_config={**run_config,
+                    "test_naive_primary_macro_rmse": naive_test["overall"]["macro"].get("primary_macro_rmse")},
+        df=df, stations=stations,
+        folds_manifest=splits.fold_manifest(splits.walk_forward_folds(df)),
+        reports=test_reports, predictions=test_result["predictions"],
+        feature_list=test_result["feature_list"],
+        feature_importance=test_result["importance"],
+        training_log=summary, split="test",
+        model_records=test_result["model_records"],
+    )
+    if spec.run_id.startswith("E1_") and spec.baseline_xgb:
+        validation_manifest = run_dir / "model" / "validation" / "manifest.json"
+        manifest = json.loads(validation_manifest.read_text(encoding="utf-8"))
+        for item in manifest["models"]:
+            item["file"] = f"../validation/{item['file']}"
+            if "training_history_file" in item:
+                item["training_history_file"] = (
+                    f"../validation/{item['training_history_file']}")
+        manifest["test_uses_validation_selected_models"] = True
+        artifacts.write_json(run_dir / "model" / "test" / "manifest.json", manifest)
+    if spec.run_id.startswith("E1_"):
+        from . import notebook_outputs
+        notebook_outputs.export(
+            run_dir, df,
+            {"validation": predictions, "test": test_result["predictions"]},
+            test_result["feature_list"],
+        )
     print(f"\nArtifacts (local): {run_dir}")
 
     if getattr(args, "upload_gcs", False):

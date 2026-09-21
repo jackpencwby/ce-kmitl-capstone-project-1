@@ -84,3 +84,18 @@ def fold_manifest(folds: list[Fold]) -> pd.DataFrame:
         }
         for f in folds
     ])
+
+
+def residual_oof_folds(df: pd.DataFrame, train_end: pd.Timestamp,
+                       n_folds: int = 4) -> list[Fold]:
+    """Expanding OOF folds inside the training window for local correction."""
+    start = pd.Timestamp(df[config.DATE_COL].min()).normalize()
+    end = pd.Timestamp(train_end).normalize()
+    warmup = start + pd.Timedelta(days=180)
+    if warmup >= end:
+        return []
+    span = (end - warmup).days
+    edges = [warmup + pd.Timedelta(days=round(i * span / n_folds))
+             for i in range(n_folds + 1)]
+    return [Fold(i + 1, edges[i] - pd.Timedelta(days=config.EMBARGO_DAYS),
+                 edges[i], edges[i + 1]) for i in range(n_folds)]

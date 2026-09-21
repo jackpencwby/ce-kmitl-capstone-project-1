@@ -31,6 +31,21 @@ def add_targets(df: pd.DataFrame, horizons: Iterable[int] = config.FORECAST_HORI
     return df
 
 
+def add_exact_day_targets(df: pd.DataFrame,
+                          horizons: Iterable[int] = config.FORECAST_HORIZONS) -> pd.DataFrame:
+    """Notebook-style targets: exact future day in the same station/segment."""
+    keys = [config.STATION_ID_COL, config.SEGMENT_ID_COL, config.DATE_COL]
+    if df.duplicated(keys).any():
+        raise ValueError("Duplicate station/segment/date rows prevent exact target lookup")
+    result = df.copy()
+    lookup = result.set_index(keys)[config.TARGET_COL]
+    for h in horizons:
+        future = result[keys].copy()
+        future[config.DATE_COL] = future[config.DATE_COL] + pd.Timedelta(days=h)
+        result[f"target_t{h}"] = lookup.reindex(pd.MultiIndex.from_frame(future)).to_numpy()
+    return result
+
+
 def target_cols(horizons: Iterable[int] = config.FORECAST_HORIZONS) -> list[str]:
     return [f"target_t{h}" for h in horizons]
 
