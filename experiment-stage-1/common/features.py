@@ -95,16 +95,18 @@ def ensure_baseline_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_base_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Full non-spatial baseline: targets + pm25 lag/roll + guard checks."""
-    df = ensure_baseline_columns(df)
+    """Use the notebook's precomputed features and the new CO/AOD columns."""
     df = df.copy()
+    expected = config.baseline_feature_list()
+    source_columns = [col for col in expected if not col.endswith("_missing")]
+    missing = sorted(set(source_columns) - set(df.columns))
+    if missing:
+        raise KeyError(f"Master table is missing model features: {missing}")
     for col in config.AIR_QUALITY_FEATURES:
-        # A constant placeholder plus a flag preserves sparse satellite rows
-        # without learning from validation/test or using future observations.
         df[f"{col}_missing"] = df[col].isna().astype("int8")
-        df[col] = df[col].fillna(0.0)
-    df = add_pm25_lag_roll(df)
-    df = add_targets(df)
+    # Match the notebook: non-finite values become NaN; XGBoost learns its
+    # missing-value branch instead of silently removing those rows.
+    df[expected] = df[expected].replace([np.inf, -np.inf], np.nan).astype("float32")
     return df
 
 

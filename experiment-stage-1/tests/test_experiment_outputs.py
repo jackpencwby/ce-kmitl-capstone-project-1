@@ -81,7 +81,7 @@ class ExperimentOutputsTests(unittest.TestCase):
                 return np.full(len(features), self.value)
 
         frame = pd.DataFrame([
-            {"station_id": sid, "date": date, "x": 2.0,
+            {"station_id": sid, "date": date, "x": (np.nan if sid == 1 else 2.0),
              "region_id": region, "target_t1": 5.0}
             for sid, region in ((1, "North"), (2, "South"))
             for date in pd.to_datetime(["2025-01-01", "2025-01-03"])

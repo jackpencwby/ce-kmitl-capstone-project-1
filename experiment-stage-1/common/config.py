@@ -38,10 +38,10 @@ GCS_ARTIFACTS_PREFIX: Final[str] = "experiment-stage-1/artifacts"
 # ---------------------------------------------------------------------------
 SEED: Final[int] = 42
 
-# Time split. The plan lists these as the current configuration; if the
-# dataset revision differs, override here only (never per experiment).
-VALIDATION_START: Final[str] = "2026-05-08"
-TEST_START: Final[str] = "2026-07-07"
+# Notebook's 70/15/15 split boundaries, retained when using the newer
+# September 19 export so the evaluation periods remain comparable.
+VALIDATION_START: Final[str] = "2025-11-19"
+TEST_START: Final[str] = "2026-04-13"
 
 # Forecast horizons t+1 .. t+7.
 FORECAST_HORIZONS: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6, 7)
@@ -232,18 +232,7 @@ MLP_PARAMS: Final[FixedMLPParams] = FixedMLPParams()
 
 
 def baseline_feature_list() -> list[str]:
-    """The non-spatial baseline feature columns produced by features.py.
+    """Notebook feature set followed by numeric CO/AOD features in the new export."""
+    from .notebook_features import NOTEBOOK_FEATURES, SEPTEMBER_19_FEATURES
 
-    Order matters only for reproducibility of feature_list.txt; the model
-    is order-invariant.
-    """
-    feats: list[str] = []
-    feats += [f"pm25_lag_{lag}" for lag in PM25_LAGS]
-    feats += [f"pm25_roll_mean_{w}" for w in PM25_ROLL_WINDOWS]
-    feats += [f"pm25_roll_std_{w}" for w in PM25_ROLL_WINDOWS]
-    feats += list(WEATHER_FEATURES)
-    feats += list(FIRE_FEATURES)
-    feats += list(AIR_QUALITY_FEATURES)
-    feats += [f"{col}_missing" for col in AIR_QUALITY_FEATURES]
-    feats += list(CALENDAR_FEATURES)
-    return feats
+    return list(NOTEBOOK_FEATURES + SEPTEMBER_19_FEATURES)

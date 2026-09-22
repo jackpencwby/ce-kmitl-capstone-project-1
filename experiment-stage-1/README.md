@@ -98,7 +98,10 @@ Runs prefer this local copy by default; `--source local` requires it.
 Set once in `common/config.py` (plan section 3):
 
 - Seed `42`
-- `validation_start = 2026-05-08`, `test_start = 2026-07-07` (test is locked)
+- `validation_start = 2025-11-19`, `test_start = 2026-04-13`, matching the
+  original notebook's 70/15/15 split boundaries. The September 19 dataset
+  extends farther in time, so these fixed dates no longer give exact 70/15/15
+  proportions on the new file.
 - Horizons `t+1 … t+7`
 - 4 expanding walk-forward folds with a 7-day embargo
 - Weather-only stations (pm25 missing > 30% in training) are dropped as targets
@@ -108,24 +111,15 @@ Set once in `common/config.py` (plan section 3):
 
 ## Feature baseline
 
-Built causally in `common/features.py` (plan section 3.1, no look-ahead):
-
-- Target-station PM2.5 lags 1/3/7/30 and rolling mean/std of the lagged series
-- Same-day weather (temperature, humidity, pressure, wind speed, wind
-  direction sin/cos, rainfall) and fire/hotspot activity
-- Calendar cyclical features (known future)
-- Same-day CO mean, CO 8-hour maximum (`ug/m3`), and AOD at 500 nm:
-  `co_mean_ugm3`, `co_8h_max_ugm3`, `aod500_mean`. Each has a `_missing`
-  indicator; missing measurements use a zero placeholder. This keeps rows
-  with missing CO/AOD usable for every algorithm without future-value filling.
-- Spatial neighbor PM2.5 aggregates (E4 only), always lagged 1/3/7 days
-
-All experiments share the expanded 33-feature baseline. Source CO/AOD columns
-must exist; older exports without them fail validation. The original
-`example_dataset_1_station.csv` is a legacy schema example; use the new
-root CSV and its `clean-data_preprocess-09-19_*` metadata for current runs.
-Re-run comparisons together: results from the old dataset/baseline are not
-directly comparable. Split dates and forecast horizons remain unchanged.
+The shared baseline takes the notebook's 106 precomputed numeric features in
+the same order, then adds 22 CO/AOD measurements, lag/rolling/difference
+features, and missing indicators from the September 19 export. The full list
+is frozen in `common/notebook_features.py`. Source NaNs remain NaNs for XGBoost
+and LightGBM; GBR imputes them using a constant in its saved pipeline. Rows
+must pass `xgboost_history_valid`, as in the notebook. Targets are exact future
+calendar days within the same station and segment. E4 also adds neighbor
+features. Old artifacts use a different split and feature set; rerun all
+comparisons on the new configuration.
 
 Every XGBoost experiment in E1–E4 uses `params` and
 `full_model_params.n_estimators` from `best_params_t{h}.json` for horizon `h`.

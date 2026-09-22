@@ -82,9 +82,8 @@ class DatasetTests(unittest.TestCase):
             self.assertFalse(local.exists())
 
     def test_co_aod_are_model_inputs_and_missing_values_stay_causal(self):
-        frame = pd.DataFrame({c: [1.0] * 40 for c in
-                              (*config.WEATHER_FEATURES, *config.FIRE_FEATURES,
-                               *config.CALENDAR_FEATURES)})
+        frame = pd.DataFrame({c: [1.0] * 40 for c in config.baseline_feature_list()
+                              if not c.endswith("_missing")})
         frame["station_id"] = 1
         frame["date"] = pd.date_range("2026-01-01", periods=40)
         frame["pm25"] = 10.0
@@ -97,12 +96,14 @@ class DatasetTests(unittest.TestCase):
         for col in ("co_mean_ugm3", "co_8h_max_ugm3", "aod500_mean"):
             self.assertIn(col, columns)
             self.assertIn(col + "_missing", columns)
-        self.assertEqual(result.loc[38, "aod500_mean"], 0.0)
+        self.assertTrue(pd.isna(result.loc[38, "aod500_mean"]))
         self.assertEqual(result.loc[38, "aod500_mean_missing"], 1)
         self.assertEqual(result.loc[39, "aod500_mean"], 0.8)
         self.assertEqual(result.loc[39, "aod500_mean_missing"], 0)
         self.assertEqual(result.loc[38, "co_mean_ugm3"], 123)
-        self.assertFalse(result.loc[38, columns].isna().any())
+        self.assertTrue(pd.isna(result.loc[38, "co_8h_max_ugm3"]))
+        self.assertIn("pm25", columns)
+        self.assertEqual(result.loc[38, "pm25"], 10.0)
         self.assertTrue(pd.isna(frame.loc[38, "aod500_mean"]))
         with self.assertRaises(KeyError):
             features.build_base_features(frame.drop(columns="co_mean_ugm3"))

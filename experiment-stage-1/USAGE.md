@@ -161,10 +161,15 @@ GCS_BUCKET              = kmitl-capstone-project-data-bucket
 `clean-data_preprocess-09-19_all_stations_daily.csv` ที่ root ของ repo
 ระบบจะใช้ไฟล์ local ก่อนเสมอ ถ้าต้องการโหลดใหม่จาก GCS ให้ใช้ `--source gcs`
 
-ทุก experiment ใช้ CO (`co_mean_ugm3`, `co_8h_max_ugm3`) และ AOD
-(`aod500_mean`) พร้อม flag `_missing` ของแต่ละคอลัมน์
-ค่าที่ขาดหายใช้ 0 คู่กับ flag เพื่อเก็บแถวนั้นไว้โดยไม่ใช้ข้อมูลอนาคต
-baseline ใหม่มี 33 features จึงควรรันทุก experiment ใหม่เพื่อเปรียบเทียบกัน
+The shared baseline now uses the notebook's 106 features plus 22 CO/AOD features
+from the September 19 export (128 before station/spatial features). See
+`common/notebook_features.py`. XGBoost/LightGBM retain missing values;
+GBR imputes them. Rows must pass `xgboost_history_valid`, and targets
+are looked up on the exact future day within each station and segment.
+
+Validation begins 2025-11-19 and test begins 2026-04-13, matching the
+notebook boundaries. The extended September 19 dataset no longer has
+exact 70/15/15 proportions at those fixed dates. Re-run comparisons.
 
 > ไม่ต้องแก้โค้ดใด ๆ แค่มี `.env` ที่ถูกต้องก็เชื่อมต่อได้
 

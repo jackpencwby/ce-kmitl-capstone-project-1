@@ -127,8 +127,14 @@ def make_lgbm(prefer_gpu: bool = True):
 
 def make_gbr(prefer_gpu: bool = True):  # GBR is CPU-only regardless.
     from sklearn.ensemble import GradientBoostingRegressor
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import make_pipeline
     params = config.GBR_PARAMS.as_dict()
-    return GradientBoostingRegressor(random_state=config.SEED, **params)
+    return make_pipeline(
+        SimpleImputer(strategy="constant", fill_value=-999.0,
+                      keep_empty_features=True),
+        GradientBoostingRegressor(random_state=config.SEED, **params),
+    )
 
 
 ESTIMATOR_FACTORIES: dict[str, Callable] = {
@@ -204,7 +210,8 @@ def _fit_predict_estimator(
 
 
 def _importance_frame(est, feature_cols: list[str], tag: str) -> pd.DataFrame:
-    imp = getattr(est, "feature_importances_", None)
+    fitted = est.steps[-1][1] if hasattr(est, "steps") else est
+    imp = getattr(fitted, "feature_importances_", None)
     if imp is None or len(imp) != len(feature_cols):
         return pd.DataFrame()
     return pd.DataFrame({"feature": feature_cols, "importance": imp, "model": tag})
@@ -232,8 +239,12 @@ def _fit_partition(
 
     if spec.forecast_strategy == "multi":
         # Rows must have all 7 targets present for training (plan 2.1, 8).
-        tr = train_df.dropna(subset=feature_cols + tcols)
-        va = val_df.dropna(subset=feature_cols)
+        tr = train_df.dropna(subset=tcols)
+        va = val_df[
+            val_df[config.DATE_COL] + pd.Timedelta(days=max(config.FORECAST_HORIZONS))
+            < (pd.Timestamp(config.TEST_START) if val_df[config.DATE_COL].min()
+               < pd.Timestamp(config.TEST_START) else pd.Timestamp.max)
+        ]
         if len(va):
             tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=max(config.FORECAST_HORIZONS))
                     < va[config.DATE_COL].min()]
@@ -261,8 +272,10 @@ def _fit_partition(
     # Direct: one estimator per horizon.
     for h in config.FORECAST_HORIZONS:
         tcol = f"target_t{h}"
-        tr = train_df.dropna(subset=feature_cols + [tcol])
-        va = val_df.dropna(subset=feature_cols)
+        tr = train_df.dropna(subset=[tcol])
+        boundary = (pd.Timestamp(config.TEST_START) if val_df[config.DATE_COL].min()
+                    < pd.Timestamp(config.TEST_START) else pd.Timestamp.max)
+        va = val_df[val_df[config.DATE_COL] + pd.Timedelta(days=h) < boundary]
         if len(va):
             tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=h)
                     < va[config.DATE_COL].min()]
@@ -373,7 +386,7 @@ def predict_e1_test_from_validation_models(spec: RunSpec, df: pd.DataFrame,
             rec = model_index.get(("main", group, h))
             if rec is None:
                 continue
-            rows = part.dropna(subset=cols)
+            rows = part
             if rows.empty:
                 continue
             global_prediction = np.asarray(rec["estimator"].predict(rows[cols]))
@@ -392,6 +405,7 @@ def predict_e1_test_from_validation_models(spec: RunSpec, df: pd.DataFrame,
                         local_features = station_rows[cols].copy()
                         local_features["global_pred"] = global_prediction[positions]
                         X = local_features[local["feature_columns"]].to_numpy(dtype=np.float32)
+                        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
                         X = (X - local["mean"]) / local["std"]
                         with torch.no_grad():
                             correction = local["estimator"](
@@ -472,8 +486,11 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
 
     for h in config.FORECAST_HORIZONS:
         tcol = f"target_t{h}"
-        train_rows = df2[masks["train"]].dropna(subset=gcols + [tcol])
-        val_rows = df2[masks["validation"]].dropna(subset=gcols)
+        train_rows = df2[masks["train"]].dropna(subset=[tcol])
+        val_rows = df2[masks["validation"]]
+        if evaluation_start < pd.Timestamp(config.TEST_START):
+            val_rows = val_rows[val_rows[config.DATE_COL] + pd.Timedelta(days=h)
+                                < pd.Timestamp(config.TEST_START)]
         if len(val_rows):
             train_rows = train_rows[
                 train_rows[config.DATE_COL] + pd.Timedelta(days=h)
@@ -498,8 +515,9 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
         oof_parts = []
         for fold in folds:
             tmask, vmask = splits.fold_masks(df2, fold)
-            ftr = df2[tmask].dropna(subset=gcols + [tcol])
-            fva = df2[vmask].dropna(subset=gcols + [tcol])
+            ftr = df2[tmask].dropna(subset=[tcol])
+            fva = df2[vmask].dropna(subset=[tcol])
+            fva = fva[fva[config.DATE_COL] + pd.Timedelta(days=h) < evaluation_start]
             ftr = ftr[ftr[config.DATE_COL] + pd.Timedelta(days=h)
                       < fold.valid_start]
             if len(ftr) == 0 or len(fva) == 0:
@@ -587,6 +605,11 @@ def _mlp_corrector(spec, factory, oof, val_pred, gcols,
         Xtr = otr[mlp_cols].to_numpy(dtype=np.float32)
         ytr = otr["residual"].to_numpy(dtype=np.float32).reshape(-1, 1)
         Xva = va[mlp_cols].to_numpy(dtype=np.float32)
+
+        # The shared notebook features contain NaNs. XGBoost handles them;
+        # the MLP needs a finite, fixed placeholder before train-only scaling.
+        Xtr = np.nan_to_num(Xtr, nan=0.0, posinf=0.0, neginf=0.0)
+        Xva = np.nan_to_num(Xva, nan=0.0, posinf=0.0, neginf=0.0)
 
         mu, sigma = Xtr.mean(0), Xtr.std(0)
         sigma[sigma == 0] = 1.0

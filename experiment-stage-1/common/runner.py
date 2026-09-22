@@ -38,8 +38,12 @@ def prepare_dataframe(spec: models.RunSpec, source: str) -> pd.DataFrame:
     """Load the master table and build all features the spec needs."""
     df = data.load_master(source=source)
     df = features.build_base_features(df)
-    if spec.run_id.startswith("E1_"):
-        df = features.add_exact_day_targets(df)
+    df = features.add_exact_day_targets(df)
+    if "xgboost_history_valid" not in df.columns:
+        raise KeyError("Master table is missing xgboost_history_valid")
+    eligible_history = (df["xgboost_history_valid"].astype(str).str.strip()
+                        .str.lower().isin(("true", "1", "1.0")))
+    df = df.loc[eligible_history].copy()
     if spec.include_region_id or spec.training_strategy == "regional":
         df = features.assign_region(df)
     if spec.spatial_mode != "none":
