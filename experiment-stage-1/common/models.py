@@ -19,14 +19,14 @@ fit is fit on training rows only (plan section 15).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
 
-from . import config, features, metrics, splits
+from . import config, features, metrics, splits, training
 
 LOGGER = logging.getLogger(__name__)
 
@@ -158,6 +158,11 @@ class RunSpec:
     include_station_id: bool = False    # global/regional add station_id feature
     include_region_id: bool = False     # regional adds region_id feature
     baseline_xgb: bool = False          # E1 shared XGBoost recipe + early stopping
+    complete_target_evaluation: bool = False  # E3 common complete-seven cohort
+    walk_forward: bool = False
+    selection_patience: int | None = None  # E2–E4 train-only stopping + refit
+    evaluation_end: str | None = None  # exclusive fold label boundary
+    evaluation_start: str | None = None  # fixed split start, before filtering origins
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +171,7 @@ class RunSpec:
 def assemble_feature_columns(spec: RunSpec) -> list[str]:
     cols = config.baseline_feature_list()
     if spec.spatial_mode != "none":
-        cols = cols + features.neighbor_feature_cols()
+        cols = cols + features.neighbor_feature_cols(mode=spec.spatial_mode)
     return cols
 
 
@@ -237,28 +242,51 @@ def _fit_partition(
     preds: list[pd.DataFrame] = []
     importances: list[pd.DataFrame] = []
 
+    boundary = (pd.Timestamp(spec.evaluation_end) if spec.evaluation_end else
+                pd.Timestamp(config.TEST_START) if val_df[config.DATE_COL].min()
+                < pd.Timestamp(config.TEST_START) else pd.Timestamp.max)
+    train_label_end = (pd.Timestamp(spec.evaluation_start) if spec.evaluation_start
+                       else val_df[config.DATE_COL].min())
+    if spec.complete_target_evaluation:
+        # Both E3 variants must be trainable on the same station/group. Direct
+        # still uses its per-horizon training rows once this common gate passes.
+        complete_train = train_df.dropna(subset=tcols)
+        complete_train = complete_train[complete_train[config.DATE_COL]
+            + pd.Timedelta(days=max(config.FORECAST_HORIZONS)) < train_label_end]
+        if complete_train.empty:
+            return pd.DataFrame(columns=id_cols + ["horizon", "y_true", "y_pred"]), importances
+        val_df = val_df.dropna(subset=tcols)
+        val_df = val_df[val_df[config.DATE_COL]
+                        + pd.Timedelta(days=max(config.FORECAST_HORIZONS)) < boundary]
+
+    def fit_horizon(h, tr, va):
+        if spec.selection_patience and spec.algorithm in ('xgboost', 'lightgbm'):
+            est = training.fit_temporal_selection(
+                _horizon_factory(factory, h), spec.prefer_gpu, spec.algorithm,
+                tr[feature_cols], tr[f'target_t{h}'], tr[config.DATE_COL],
+                h, spec.selection_patience)
+            return est.predict(va[feature_cols]), est
+        return _fit_predict_estimator(
+            _horizon_factory(factory, h), spec.prefer_gpu,
+            tr[feature_cols], tr[f'target_t{h}'], va[feature_cols],
+            va[f'target_t{h}'] if spec.baseline_xgb else None)
+
     if spec.forecast_strategy == "multi":
         # Rows must have all 7 targets present for training (plan 2.1, 8).
         tr = train_df.dropna(subset=tcols)
         va = val_df[
             val_df[config.DATE_COL] + pd.Timedelta(days=max(config.FORECAST_HORIZONS))
-            < (pd.Timestamp(config.TEST_START) if val_df[config.DATE_COL].min()
-               < pd.Timestamp(config.TEST_START) else pd.Timestamp.max)
+            < boundary
         ]
         if len(va):
             tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=max(config.FORECAST_HORIZONS))
-                    < va[config.DATE_COL].min()]
+                    < train_label_end]
         if len(tr) == 0 or len(va) == 0:
             return pd.DataFrame(columns=id_cols + ["horizon", "y_true", "y_pred"]), importances
         # MultiOutputRegressor fits independent target estimators. Fit them
         # explicitly so each horizon receives its own selected parameters.
         for h in config.FORECAST_HORIZONS:
-            hfactory = _horizon_factory(factory, h)
-            yhat, estimator = _fit_predict_estimator(
-                hfactory, spec.prefer_gpu, tr[feature_cols], tr[f"target_t{h}"],
-                va[feature_cols],
-                va[f"target_t{h}"] if spec.baseline_xgb else None,
-            )
+            yhat, estimator = fit_horizon(h, tr, va)
             if model_records is not None:
                 _record(model_records, estimator, group, h)
             block = va[id_cols].copy()
@@ -273,18 +301,13 @@ def _fit_partition(
     for h in config.FORECAST_HORIZONS:
         tcol = f"target_t{h}"
         tr = train_df.dropna(subset=[tcol])
-        boundary = (pd.Timestamp(config.TEST_START) if val_df[config.DATE_COL].min()
-                    < pd.Timestamp(config.TEST_START) else pd.Timestamp.max)
         va = val_df[val_df[config.DATE_COL] + pd.Timedelta(days=h) < boundary]
         if len(va):
             tr = tr[tr[config.DATE_COL] + pd.Timedelta(days=h)
-                    < va[config.DATE_COL].min()]
+                    < train_label_end]
         if len(tr) == 0 or len(va) == 0 or (spec.baseline_xgb and not va[tcol].notna().any()):
             continue
-        yhat, est = _fit_predict_estimator(
-            _horizon_factory(factory, h), spec.prefer_gpu, tr[feature_cols], tr[tcol], va[feature_cols],
-            va[tcol] if spec.baseline_xgb else None,
-        )
+        yhat, est = fit_horizon(h, tr, va)
         if model_records is not None:
             _record(model_records, est, group, h)
         block = va[id_cols].copy()
@@ -327,7 +350,7 @@ def _add_categorical_codes(df: pd.DataFrame, spec: RunSpec, feature_cols: list[s
 # Main holdout run (train window -> validation window)
 # ---------------------------------------------------------------------------
 def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list,
-                evaluation: str = "validation") -> dict:
+                evaluation: str = "validation", fold: splits.Fold | None = None) -> dict:
     """Fit on the training window and predict the validation holdout.
 
     Returns predictions, reports, feature importances, and the feature list.
@@ -339,11 +362,22 @@ def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list,
 
     df = df[df[config.STATION_ID_COL].isin(stations)].copy()
     masks = splits.date_masks(df)
-    if evaluation == "test":
+    if fold is not None:
+        if evaluation != 'validation':
+            raise ValueError('Walk-forward folds cannot evaluate test')
+        masks['train'], masks['validation'] = splits.fold_masks(df, fold)
+        spec = replace(spec, evaluation_start=fold.valid_start.isoformat(),
+                       evaluation_end=fold.valid_end.isoformat())
+    elif evaluation == "test":
         masks["train"] = masks["train"] | masks["validation"]
         masks["validation"] = masks["test"]
     elif evaluation != "validation":
         raise ValueError(f"Unknown evaluation split: {evaluation}")
+
+    if fold is None and not spec.baseline_xgb:
+        spec = replace(spec, evaluation_start=(config.TEST_START if evaluation == 'test'
+                                               else config.VALIDATION_START),
+                       evaluation_end=(None if evaluation == 'test' else config.TEST_START))
 
     if spec.training_strategy == "local":
         return _run_local(spec, df, factory, feature_cols, masks)
@@ -352,6 +386,35 @@ def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list,
     if spec.training_strategy in ("global_local_tree", "global_local_mlp"):
         return _run_residual(spec, df, factory, feature_cols, masks)
     raise ValueError(f"Unknown training strategy: {spec.training_strategy}")
+
+
+def run_walk_forward(spec: RunSpec, df: pd.DataFrame, stations: list) -> dict:
+    """Fit fresh models in each chronological fold; never include test labels."""
+    blocks, summaries, selections = [], [], []
+    for fold in splits.walk_forward_folds(df):
+        result = run_holdout(spec, df, stations, fold=fold)
+        prediction = result['predictions'].copy()
+        prediction['fold'] = fold.index
+        blocks.append(prediction)
+        summaries.append({
+            'fold':fold.index, 'train_end_exclusive':fold.train_end.isoformat(),
+            'valid_start':fold.valid_start.isoformat(),
+            'valid_end_exclusive':fold.valid_end.isoformat(),
+            'n':result['reports']['overall']['micro'].get('n',0),
+            'primary_macro_rmse':result['reports']['overall']['macro'].get('primary_macro_rmse'),
+            'models_fitted':len(result['model_records']),
+            'status':'scored' if len(prediction) else 'no_eligible_rows'})
+        for record in result['model_records']:
+            selections.append({'fold':fold.index, 'group':record['group'],
+                               'horizon':record['horizon'],
+                               **getattr(record['estimator'], 'selection_metadata_',
+                                         {'policy':'fixed_budget'})})
+        del result  # Do not keep fitted estimators from earlier folds in memory.
+    predictions = pd.concat(blocks, ignore_index=True) if blocks else pd.DataFrame()
+    result = _finalize(spec, predictions, [], assemble_feature_columns(spec), [])
+    result['fold_metrics'] = pd.DataFrame(summaries)
+    result['model_selection'] = pd.DataFrame(selections)
+    return result
 
 
 def predict_local_test_from_validation_models(spec: RunSpec, df: pd.DataFrame,

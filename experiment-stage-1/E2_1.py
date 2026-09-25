@@ -3,9 +3,9 @@
 
 Algorithm axis held at XGBoost with objective reg:squarederror and fixed
 reasonable defaults (no Optuna in Stage 1). Other axes fixed at baseline:
-training=Local, forecast=Direct, spatial=No neighbor. This coincides with
-the Stage 1 baseline and the E1.1 configuration by design, so E2 comparisons
-share one cohort.
+training=Local, forecast=Direct, spatial=No neighbor. E2 runs real walk-forward
+CV and selects tree counts on a training-only chronological tail before refit;
+E1's validation-selected-model test policy is separate.
 
 Usage:
   python E2_1.py --train
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 
-from common import cli, models, runner
+from common import cli, config, models, runner
 
 
 def main() -> int:
@@ -28,6 +28,8 @@ def main() -> int:
         run_id="E2_LOCAL__XGB__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="local",
+        walk_forward=True,
+        selection_patience=config.SCREENING_EARLY_STOPPING_ROUNDS,
         forecast_strategy="direct",
         spatial_mode="none",
     )

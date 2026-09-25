@@ -103,7 +103,7 @@ Set once in `common/config.py` (plan section 3):
   extends farther in time, so these fixed dates no longer give exact 70/15/15
   proportions on the new file.
 - Horizons `t+1 … t+7`
-- 4 expanding walk-forward folds with a 7-day embargo
+- E2–E4 execute 4 expanding walk-forward folds with a 7-day embargo; E1 retains its separate holdout policy
 - Weather-only stations (pm25 missing > 30% in training) are dropped as targets
 - XGBoost parameters selected per horizon from `best_params_t1.json` through `best_params_t7.json` (no search during Stage 1 runs)
 - LightGBM and GradientBoostingRegressor keep their own fixed parameters in `common/config.py`
@@ -140,7 +140,28 @@ use the same per-horizon XGBoost parameters on out-of-fold residuals; auxiliary
 out-of-fold fits use the tail of their own training window for early stopping,
 with a horizon-length target cutoff. All E1 test predictions reuse the models
 selected before test, including any local residual correctors.
-E2–E4 XGBoost runs use the same per-horizon parameters without early stopping.
+E2–E4 XGBoost and LightGBM select tree counts using the chronological final
+15% of each training window, with 100-round stopping patience and a label
+gap before the selection tail. They then refit a fresh model on all eligible
+training rows using that tree count. Neither outer validation nor test labels
+enter this selection. If the inner fit has fewer than 50 rows or its tail
+fewer than 10, the fixed budget is used and recorded as `insufficient_history`.
+GBR remains fixed-budget. LightGBM explicitly enables its 80% row sampling
+with `subsample_freq=1`. This is screening with frozen parameter recipes,
+not a new equal-budget hyperparameter search across algorithms.
+
+Both E3 variants score the same complete-seven-target origins, with a shared
+seven-day cutoff before the end of each validation fold/holdout. A station
+must also have complete, purged training vectors so both variants can fit.
+Direct still trains per horizon; Multi trains on complete target vectors.
+Training labels are bounded by the fixed split start, even when missing
+targets remove the earliest evaluation origins. E2/E4 keep per-horizon support.
+
+E4 builds spatial inputs from observed source rows before selecting
+`xgboost_history_valid` target origins. Wind mode uses distance fallback for
+missing directions/speeds, wind speed <= 0, or negligible effective weight
+after excluding missing PM. Its fallback flags are lagged by exact calendar
+day within the target segment, like the PM features. No-neighbor values stay NaN.
 Their test models are fitted again on train plus validation data. E3.2 fits
 independent horizon estimators on rows with all seven targets available.
 
@@ -165,6 +186,22 @@ fit is made. For E2–E4, the test fit uses train plus validation origins, but
 excludes any training target whose forecast date reaches the test period.
 The validation fit uses only training origins with labels available before
 validation starts.
+
+E2–E4 also save `predictions_cv.parquet`, `metrics_*_cv` reports,
+`cv_fold_metrics.csv`, and `cv_model_selection.csv` from actual fold fits.
+CV aggregate scores pool out-of-fold predictions; per-fold scores are separate.
+Use `persistence_comparison_{cv,validation,test}.json` to compare model and
+persistence on identical finite station/date/horizon support. The regular
+model metrics retain all available model targets; they can have more rows
+when current PM is missing. Config records paired sample counts/scores,
+actual versus requested device, spatial configuration and separate CV,
+validation and test elapsed times (including scoring, not pure fit time).
+
+The September 25 correctness revision changes E2–E4 training/evaluation policy
+and E4 features. Rerun E2.1–E2.3, E3.1–E3.2 and E4.1–E4.4 on one frozen dataset
+to obtain comparable corrected results. Existing artifacts are retained for
+provenance and are not repaired by updating the source. CV and inner selection
+perform additional fits, so training is longer than the previous holdout-only run.
 
 E4 artifact audit (2026-09-25): the four runs dated 20260924–20260925
 examined in `artifacts/E4_audit_20260925/REPORT.md` contain validation

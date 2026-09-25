@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 
-from common import cli, models, runner
+from common import cli, config, models, runner
 
 
 def main() -> int:
@@ -28,6 +28,7 @@ def main() -> int:
         run_id="E2_LOCAL__GBR__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="gbr",
         training_strategy="local",
+        walk_forward=True,
         forecast_strategy="direct",
         spatial_mode="none",
     )

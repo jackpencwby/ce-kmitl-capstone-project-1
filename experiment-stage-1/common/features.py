@@ -217,7 +217,8 @@ def build_neighbor_table(
                 "distance_km": d,
                 "bearing_deg": b,
             })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=[config.STATION_ID_COL, "neighbor_id",
+                                       "distance_km", "bearing_deg"])
 
 
 def _neighbor_pm_wide(df: pd.DataFrame) -> pd.DataFrame:
@@ -226,7 +227,10 @@ def _neighbor_pm_wide(df: pd.DataFrame) -> pd.DataFrame:
         index=config.DATE_COL, columns=config.STATION_ID_COL,
         values=config.TARGET_COL, aggfunc="first",
     )
-    return wide
+    # A target needs its neighbors even when all of its own PM is missing.
+    # Retain all observed dates too, including dates with no valid PM anywhere.
+    return wide.reindex(index=pd.Index(df[config.DATE_COL].unique(), name=config.DATE_COL),
+                        columns=df[config.STATION_ID_COL].unique())
 
 
 def add_neighbor_features(
@@ -241,8 +245,11 @@ def add_neighbor_features(
     A daily neighbor aggregate is computed from *same-day* neighbor pm25,
     then lagged by 1/3/7 days so day t only sees neighbor values from the
     past (plan E4 leakage rules 4-5). Missing neighbors are renormalised out;
-    calm wind / zero weight falls back to the distance-weighted value.
+    calm wind / zero effective weight falls back to the distance-weighted value.
+    Wind mode also lags a fallback indicator using the same day/segment keys.
     """
+    if mode not in {"unweighted", "distance", "wind"}:
+        raise ValueError(f"Unknown neighbor mode: {mode}")
     df = df.copy()
     wide = _neighbor_pm_wide(df)
     dates = wide.index
@@ -254,15 +261,22 @@ def add_neighbor_features(
 
     # Daily wind-from per station (only needed for wind mode).
     wind_wide = None
+    speed_wide = None
     if mode == "wind":
         wind_wide = df.pivot_table(
             index=config.DATE_COL, columns=config.STATION_ID_COL,
             values=config.WIND_FROM_COL, aggfunc="first",
         )
+        if "wind_speed_avg" in df.columns:
+            speed_wide = df.pivot_table(
+                index=config.DATE_COL, columns=config.STATION_ID_COL,
+                values="wind_speed_avg", aggfunc="first",
+            ).reindex(index=dates, columns=wide.columns)
 
     # Accumulate per-station aggregates in a dict, then build the frame once
     # (assigning columns one at a time fragments the DataFrame).
     agg_cols: dict[object, np.ndarray] = {}
+    fallback_cols: dict[object, np.ndarray] = {}
     eps = spatial.epsilon_km
     nan_col = np.full(len(dates), np.nan)
     for sid in wide.columns:
@@ -270,6 +284,8 @@ def add_neighbor_features(
         nb_ids = [n[0] for n in neighbor_list if n[0] in wide.columns]
         if not nb_ids:
             agg_cols[sid] = nan_col
+            if mode == "wind":
+                fallback_cols[sid] = np.ones(len(dates), dtype="int8")
             continue
         nb_pm = wide[nb_ids]  # dates x neighbors
         dist = np.array([n[1] for n in neighbor_list if n[0] in wide.columns])
@@ -291,61 +307,77 @@ def add_neighbor_features(
             wmat = np.zeros(nb_pm.shape)
             for j in range(len(nb_ids)):
                 delta = np.array([
-                    angular_difference_deg(w_i, bearing[j]) if not np.isnan(w_i) else np.nan
+                    angular_difference_deg(w_i, bearing[j]) if np.isfinite(w_i) else np.nan
                     for w_i in wf
                 ])
                 cos_term = np.cos(np.radians(delta))
                 cos_term = np.clip(cos_term, 0.0, None) ** spatial.wind_power
                 wmat[:, j] = cos_term * dist_w[j]
             wind_agg = _weighted_row_mean(nb_pm.values, wmat)
-            # Fallback to distance-weighted where wind weights sum to ~0.
+            # Only observed PM contributes effective weight. Scale the tolerance
+            # to distance weights so floating-point cos(90 degrees) is zero.
             dist_full = np.broadcast_to(dist_w, nb_pm.shape).copy()
             dist_agg = _weighted_row_mean(nb_pm.values, dist_full)
-            zero_wind = np.nan_to_num(wmat).sum(axis=1) <= 0
-            wind_agg[zero_wind] = dist_agg[zero_wind]
+            observed = np.isfinite(nb_pm.values)
+            effective_wind = np.where(observed & np.isfinite(wmat), wmat, 0.).sum(axis=1)
+            effective_dist = np.where(observed, dist_full, 0.).sum(axis=1)
+            fallback = ~np.isfinite(wf) | (effective_wind <= 1e-12 * effective_dist)
+            if speed_wide is not None:
+                speed = speed_wide[sid].to_numpy()
+                fallback |= ~np.isfinite(speed) | (speed <= spatial.calm_speed_threshold)
+            wind_agg[fallback] = dist_agg[fallback]
             agg_cols[sid] = wind_agg
+            fallback_cols[sid] = fallback.astype("int8")
             continue
 
         raise ValueError(f"Unknown neighbor mode: {mode}")
-
-    agg = pd.DataFrame(agg_cols, index=dates)
 
     # Melt aggregate back to long form keyed by (date, station_id). The pivot
     # turns station ids into column labels (object dtype); cast them back to
     # the original station_id dtype so the merge matches and does not upcast
     # df's station_id column to object.
-    agg_long = agg.reset_index().melt(
-        id_vars=config.DATE_COL, var_name=config.STATION_ID_COL, value_name="neighbor_pm_agg"
-    )
-    agg_long[config.STATION_ID_COL] = agg_long[config.STATION_ID_COL].astype(
-        df[config.STATION_ID_COL].dtype
-    )
-    df = df.merge(agg_long, on=[config.DATE_COL, config.STATION_ID_COL], how="left")
+    daily_values = {"neighbor_pm": agg_cols}
+    if mode == "wind":
+        daily_values["neighbor_wind_fallback"] = fallback_cols
+    for name, values in daily_values.items():
+        agg = pd.DataFrame(values, index=dates)
+        agg_long = agg.reset_index().melt(
+            id_vars=config.DATE_COL, var_name=config.STATION_ID_COL, value_name=name
+        )
+        agg_long[config.STATION_ID_COL] = agg_long[config.STATION_ID_COL].astype(
+            df[config.STATION_ID_COL].dtype
+        )
+        df = df.merge(agg_long, on=[config.DATE_COL, config.STATION_ID_COL], how="left")
 
     # History filtering can remove dates. Match exact calendar days rather
     # than shifting rows, and never carry values across target segments.
     keys = [config.STATION_ID_COL, config.DATE_COL]
     if config.SEGMENT_ID_COL in df.columns:
         keys.append(config.SEGMENT_ID_COL)
-    source = df[keys + ["neighbor_pm_agg"]]
+    source = df[keys + list(daily_values)]
     for lag in spatial.neighbor_lags:
         lagged = source.copy()
         lagged[config.DATE_COL] += pd.Timedelta(days=lag)
-        lagged = lagged.rename(columns={"neighbor_pm_agg": f"neighbor_pm_lag_{lag}"})
+        lagged = lagged.rename(columns={name: f"{name}_lag_{lag}" for name in daily_values})
         df = df.merge(lagged, on=keys, how="left", sort=False, validate="one_to_one")
-    df = df.drop(columns=["neighbor_pm_agg"])
+    df = df.drop(columns=list(daily_values))
     return df
 
 
 def _weighted_row_mean(values: np.ndarray, weights: np.ndarray) -> np.ndarray:
     """Row-wise weighted mean ignoring NaN pm values (renormalise weights)."""
-    mask = ~np.isnan(values)
-    w = np.where(mask, weights, 0.0)
+    mask = np.isfinite(values)
+    w = np.where(mask & np.isfinite(weights), weights, 0.0)
     num = np.nansum(np.where(mask, values, 0.0) * w, axis=1)
     den = w.sum(axis=1)
     out = np.divide(num, den, out=np.full(num.shape, np.nan), where=den > 0)
     return out
 
 
-def neighbor_feature_cols(spatial: config.SpatialConfig = config.SPATIAL) -> list[str]:
-    return [f"neighbor_pm_lag_{lag}" for lag in spatial.neighbor_lags]
+def neighbor_feature_cols(spatial: config.SpatialConfig = config.SPATIAL,
+                          mode: Optional[str] = None) -> list[str]:
+    """Return PM lags, adding causal fallback flags only for explicit wind mode."""
+    cols = [f"neighbor_pm_lag_{lag}" for lag in spatial.neighbor_lags]
+    if mode == "wind":
+        cols += [f"neighbor_wind_fallback_lag_{lag}" for lag in spatial.neighbor_lags]
+    return cols

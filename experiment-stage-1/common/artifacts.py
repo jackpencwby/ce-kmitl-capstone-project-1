@@ -88,6 +88,33 @@ def make_run_dir(run_id: str) -> Path:
     return run_dir
 
 
+def _estimator_device(estimator) -> Optional[str]:
+    """Read fitted estimator state before falling back to library parameters."""
+    if hasattr(estimator, "get_booster"):
+        try:
+            learner = json.loads(estimator.get_booster().save_config())["learner"]
+            fitted_device = learner.get("generic_param", {}).get("device")
+            if fitted_device:
+                return str(fitted_device)
+        except (AttributeError, KeyError, ValueError):
+            pass
+    if hasattr(estimator, "parameters"):
+        try:
+            return str(next(estimator.parameters()).device)
+        except StopIteration:
+            pass
+    if type(estimator).__module__.startswith("sklearn."):
+        return "cpu"
+    params = estimator.get_params() if hasattr(estimator, "get_params") else {}
+    booster = getattr(estimator, "booster_", None)
+    if booster is not None:
+        params = {**params, **getattr(booster, "params", {})}
+    for key in ("device_type", "device"):
+        if params.get(key) is not None:
+            return str(params[key])
+    return None
+
+
 def write_json(path: Path, obj: dict) -> None:
     def _default(o):
         if isinstance(o, (np.integer,)):
@@ -138,14 +165,23 @@ def save_run(
     training_log: str = "",
     split: str = "validation",
     model_records: Optional[list] = None,
+    prefer_gpu: bool = True,
 ) -> None:
     """Persist the full artifact set for one run."""
-    device = detect_device()
+    device = detect_device(prefer_gpu=prefer_gpu)
+    actual_devices = {_estimator_device(rec["estimator"]) or "unknown"
+                      for rec in model_records or []}
+    if actual_devices:
+        actual_device = next(iter(actual_devices)) if len(actual_devices) == 1 else "mixed"
+    else:
+        actual_device = run_config.get("actual_device", run_config.get("device", "unknown"))
+    device.update({"requested_device": "gpu" if prefer_gpu else "cpu",
+                   "actual_device": actual_device, "device": actual_device})
     full_config = {"run_id": run_id, **run_config, **device,
                    "seed": config.SEED,
                    "validation_start": config.VALIDATION_START,
                    "test_start": config.TEST_START,
-                   "evaluation_splits": ["validation", "test"],
+                   "evaluation_splits": run_config.get("evaluation_splits", ["validation", "test"]),
                    "forecast_horizons": list(config.FORECAST_HORIZONS)}
     write_json(run_dir / "config.json", full_config)
     write_json(run_dir / "dataset_manifest.json", dataset_manifest(df, stations))
@@ -206,10 +242,22 @@ def save_models(run_dir: Path, records: list, split: str,
                 "feature_columns": rec.get("feature_columns", feature_list)}
         if hasattr(estimator, "get_params"):
             item["full_model_params"] = estimator.get_params()
+        actual_device = _estimator_device(estimator)
+        if actual_device is not None:
+            item["actual_device"] = actual_device
+        selection = getattr(estimator, "selection_metadata_", None)
+        if selection is not None:
+            item["selection_metadata"] = selection
+            if "selected_iteration" in selection:
+                item["selected_iteration"] = selection["selected_iteration"]
         if hasattr(estimator, "best_iteration"):
             item["best_iteration"] = int(estimator.best_iteration)
-            history = estimator.evals_result()
-            if history:
+        if hasattr(estimator, "evals_result"):
+            try:
+                history = estimator.evals_result()
+            except Exception:  # A final refit has no evaluation history.
+                history = {}
+            if history and "validation_0" in history and "validation_1" in history:
                 history_path = model_dir / f"{stem}__training_history.csv"
                 pd.DataFrame({"train_rmse": history["validation_0"]["rmse"],
                               "validation_rmse": history["validation_1"]["rmse"]}).to_csv(
