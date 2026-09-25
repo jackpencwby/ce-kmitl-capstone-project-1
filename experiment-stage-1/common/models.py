@@ -426,8 +426,10 @@ def _run_local(spec, df, factory, feature_cols, masks) -> dict:
     """One independent model set per station (E1.1)."""
     all_preds, all_imp, records = [], [], []
     for sid, sub in df.groupby(config.STATION_ID_COL):
-        sub_masks = splits.date_masks(sub)
-        tr, va = sub[sub_masks["train"]], sub[sub_masks["validation"]]
+        # Preserve the caller's evaluation split, including train+validation
+        # refits for test. Recomputing date_masks here resets it to validation.
+        tr = sub.loc[masks["train"].reindex(sub.index)]
+        va = sub.loc[masks["validation"].reindex(sub.index)]
         preds, imps = _fit_partition(spec, factory, tr, va, feature_cols,
                                      records, str(sid))
         all_preds.append(preds)
@@ -451,8 +453,8 @@ def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
         groups = list(df2.groupby("region_id"))
 
     for gname, gdf in groups:
-        gmasks = splits.date_masks(gdf)
-        tr, va = gdf[gmasks["train"]], gdf[gmasks["validation"]]
+        tr = gdf.loc[masks["train"].reindex(gdf.index)]
+        va = gdf.loc[masks["validation"].reindex(gdf.index)]
         preds, imps = _fit_partition(spec, factory, tr, va, cols,
                                      records, str(gname))
         all_preds.append(preds)

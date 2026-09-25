@@ -322,10 +322,17 @@ def add_neighbor_features(
     )
     df = df.merge(agg_long, on=[config.DATE_COL, config.STATION_ID_COL], how="left")
 
-    # Lag the aggregate (never same-day) within station.
-    g = df.groupby(config.STATION_ID_COL)["neighbor_pm_agg"]
+    # History filtering can remove dates. Match exact calendar days rather
+    # than shifting rows, and never carry values across target segments.
+    keys = [config.STATION_ID_COL, config.DATE_COL]
+    if config.SEGMENT_ID_COL in df.columns:
+        keys.append(config.SEGMENT_ID_COL)
+    source = df[keys + ["neighbor_pm_agg"]]
     for lag in spatial.neighbor_lags:
-        df[f"neighbor_pm_lag_{lag}"] = g.shift(lag)
+        lagged = source.copy()
+        lagged[config.DATE_COL] += pd.Timedelta(days=lag)
+        lagged = lagged.rename(columns={"neighbor_pm_agg": f"neighbor_pm_lag_{lag}"})
+        df = df.merge(lagged, on=keys, how="left", sort=False, validate="one_to_one")
     df = df.drop(columns=["neighbor_pm_agg"])
     return df
 

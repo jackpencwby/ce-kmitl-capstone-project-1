@@ -201,6 +201,8 @@ class ExperimentOutputsTests(unittest.TestCase):
                     self.assertEqual(set(result["reports"]["by_station"].station_id),
                                      {1, 2})
                     self.assertTrue(result["model_records"])
+                    self.assertEqual(result["predictions"].date.min(), pd.Timestamp("2025-01-31"))
+                    self.assertEqual(result["predictions"].date.max(), pd.Timestamp("2025-02-09"))
 
     def test_residual_models_and_per_station_test_metrics(self):
         dates = pd.date_range("2025-01-01", "2025-11-10", freq="D")

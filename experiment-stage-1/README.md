@@ -166,6 +166,14 @@ excludes any training target whose forecast date reaches the test period.
 The validation fit uses only training origins with labels available before
 validation starts.
 
+E4 artifact audit (2026-09-25): the four runs dated 20260924–20260925
+examined in `artifacts/E4_audit_20260925/REPORT.md` contain validation
+predictions duplicated as test predictions. The local/pooled partition code
+now preserves the requested evaluation masks. Spatial lags now match exact
+calendar dates within station/segment instead of shifting filtered rows.
+Rerun E4.1–E4.4 to create corrected validation/test artifacts; existing
+artifact files and saved models are not repaired automatically.
+
 For E1.1–E1.5, the runner also writes the notebook-compatible tree:
 `horizon_01/` through `horizon_07/` with `validation/predictions.csv`,
 `validation/metrics.csv`, `test/predictions.csv`, `test/metrics.csv`,
