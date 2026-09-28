@@ -3,9 +3,8 @@
 
 Seven separate models per training unit, one per horizon t+1..t+7. Fixed
 axes: training=Local, algorithm=XGBoost, spatial=No neighbor. For a fair
-comparison with E3.2, both are scored on rows that have all 7 targets
-present (handled by the multi-output cohort in E3.2); direct forecasting is
-also evaluated per horizon here.
+comparison with E3.2, both explicitly use the same complete-seven-target
+evaluation cohort and seven-day boundary purge. Training remains per horizon.
 
 Usage:
   python E3_1.py --train
@@ -16,7 +15,7 @@ from __future__ import annotations
 
 import sys
 
-from common import cli, models, runner
+from common import cli, config, models, runner
 
 
 def main() -> int:
@@ -28,6 +27,9 @@ def main() -> int:
         run_id="E3_LOCAL__XGB__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="local",
+        walk_forward=True,
+        selection_patience=config.SCREENING_EARLY_STOPPING_ROUNDS,
+        complete_target_evaluation=True,
         forecast_strategy="direct",
         spatial_mode="none",
     )

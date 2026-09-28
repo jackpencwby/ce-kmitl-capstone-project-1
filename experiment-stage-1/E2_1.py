@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """E2.1 - XGBoost algorithm (Experimental_Plan.md section 7).
 
-Pool stations into one shared model per horizon, with station identity as a
-feature, like E1.2. Fixed axes: Global / Direct / No neighbor.
-E2 uses common/config_e2.py parameters and its existing evaluation policy.
-
---stations selects both the training pool and the stations scored.
-Use --stations all (default) to pool every eligible station.
+Algorithm axis held at XGBoost with objective reg:squarederror and fixed
+reasonable defaults (no Optuna in Stage 1). Other axes fixed at baseline:
+training=Local, forecast=Direct, spatial=No neighbor. E2 runs real walk-forward
+CV and selects tree counts on a training-only chronological tail before refit;
+E1's validation-selected-model test policy is separate.
 
 Usage:
   python E2_1.py --train
@@ -17,7 +16,7 @@ from __future__ import annotations
 
 import sys
 
-from common import cli, models, runner
+from common import cli, config, models, runner
 
 
 def main() -> int:
@@ -29,6 +28,8 @@ def main() -> int:
         run_id="E2_GLOBAL__XGB__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="global",
+        walk_forward=True,
+        selection_patience=config.SCREENING_EARLY_STOPPING_ROUNDS,
         forecast_strategy="direct",
         spatial_mode="none",
         include_station_id=True,

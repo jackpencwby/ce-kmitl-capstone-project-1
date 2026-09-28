@@ -133,6 +133,7 @@ class SpatialConfig:
     epsilon_km: float = 1.0
     wind_power: float = 2.0  # exponent p in cos(delta)^p
     neighbor_lags: tuple[int, ...] = (1, 3, 7)
+    calm_speed_threshold: float = 0.0
 
 
 SPATIAL: Final[SpatialConfig] = SpatialConfig()
@@ -155,6 +156,7 @@ class FixedLGBMParams:
     max_depth: int = 8
     min_child_samples: int = 30
     subsample: float = 0.8
+    subsample_freq: int = 1
     colsample_bytree: float = 0.8
     reg_alpha: float = 0.0
     reg_lambda: float = 1.0
@@ -167,6 +169,7 @@ class FixedLGBMParams:
             "max_depth": self.max_depth,
             "min_child_samples": self.min_child_samples,
             "subsample": self.subsample,
+            "subsample_freq": self.subsample_freq,
             "colsample_bytree": self.colsample_bytree,
             "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
@@ -212,6 +215,7 @@ class FixedMLPParams:
 
 
 BASELINE_EARLY_STOPPING_ROUNDS: Final[int] = 100
+SCREENING_EARLY_STOPPING_ROUNDS: Final[int] = 100
 
 
 def xgb_params_for_horizon(horizon: int) -> dict:

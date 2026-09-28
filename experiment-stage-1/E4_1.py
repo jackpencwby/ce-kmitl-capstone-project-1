@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import sys
 
-from common import cli, models, runner
+from common import cli, config, models, runner
 
 
 def main() -> int:
@@ -27,6 +27,8 @@ def main() -> int:
         run_id="E4_LOCAL__XGB__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="local",
+        walk_forward=True,
+        selection_patience=config.SCREENING_EARLY_STOPPING_ROUNDS,
         forecast_strategy="direct",
         spatial_mode="none",
     )

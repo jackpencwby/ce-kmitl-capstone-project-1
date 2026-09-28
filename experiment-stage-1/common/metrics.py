@@ -138,3 +138,32 @@ def persistence_prediction(df_rows: pd.DataFrame) -> pd.DataFrame:
         sub["horizon"] = h
         records.append(sub)
     return pd.concat(records, ignore_index=True)
+
+
+def paired_persistence_reports(predictions: pd.DataFrame,
+                               source_rows: pd.DataFrame) -> dict:
+    """Compare model and persistence on identical finite station/date/horizon rows.
+
+    Targets come from the prediction frame; persistence uses observed current
+    PM from the source rows. The input frames and standalone model reports are
+    untouched. Duplicate keys fail rather than silently multiplying support.
+    """
+    row_keys = [config.STATION_ID_COL, config.DATE_COL]
+    prediction_keys = [*row_keys, "horizon"]
+    if predictions.duplicated(prediction_keys).any():
+        raise ValueError("Duplicate station/date/horizon prediction keys")
+    if source_rows.duplicated(row_keys).any():
+        raise ValueError("Duplicate station/date source keys")
+    current = source_rows[[*row_keys, config.TARGET_COL]].rename(
+        columns={config.TARGET_COL: "persistence_pred"})
+    paired = predictions[[*prediction_keys, "y_true", "y_pred"]].merge(
+        current, on=row_keys, how="inner", validate="many_to_one")
+    value_columns = ["y_true", "y_pred", "persistence_pred"]
+    paired[value_columns] = paired[value_columns].astype(float)
+    finite = np.isfinite(paired[value_columns]).all(axis=1)
+    paired = paired.loc[finite & paired[prediction_keys].notna().all(axis=1)]
+    model = paired[[*prediction_keys, "y_true", "y_pred"]].copy()
+    persistence = model.copy()
+    persistence["y_pred"] = paired["persistence_pred"]
+    return {"model": build_reports(model), "persistence": build_reports(persistence),
+            "n": int(len(paired))}
