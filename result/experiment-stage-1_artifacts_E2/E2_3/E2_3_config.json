@@ -1,0 +1,121 @@
+{
+  "run_id": "E2_GLOBAL__GBR__DIRECT__NO_NEIGHBOR__SEED42",
+  "algorithm": "gbr",
+  "training_strategy": "global",
+  "forecast_strategy": "direct",
+  "spatial_mode": "none",
+  "include_station_id": true,
+  "include_region_id": false,
+  "elapsed_seconds": 23171.664479,
+  "naive_primary_macro_rmse": 10.942211775884056,
+  "parameter_profile": "e2",
+  "fixed_params": {
+    "loss": "squared_error",
+    "n_estimators": 1000,
+    "learning_rate": 0.05,
+    "max_depth": 5,
+    "min_samples_leaf": 20,
+    "min_samples_split": 40,
+    "subsample": 0.8,
+    "max_features": 0.8
+  },
+  "params_by_horizon": {
+    "1": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "2": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "3": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "4": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "5": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "6": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    },
+    "7": {
+      "loss": "squared_error",
+      "n_estimators": 1000,
+      "learning_rate": 0.05,
+      "max_depth": 5,
+      "min_samples_leaf": 20,
+      "min_samples_split": 40,
+      "subsample": 0.8,
+      "max_features": 0.8
+    }
+  },
+  "params_source": "common/config_e2.py",
+  "early_stopping_rounds": null,
+  "python_version": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "torch_version": "2.14.0+cu132",
+  "xgboost_version": "3.4.1",
+  "lightgbm_version": "4.7.0",
+  "sklearn_version": "1.9.1",
+  "cuda_version": "13.2",
+  "gpu_model": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+  "device": "cuda",
+  "seed": 42,
+  "validation_start": "2025-11-19",
+  "test_start": "2026-04-13",
+  "evaluation_splits": [
+    "validation",
+    "test"
+  ],
+  "forecast_horizons": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ]
+}

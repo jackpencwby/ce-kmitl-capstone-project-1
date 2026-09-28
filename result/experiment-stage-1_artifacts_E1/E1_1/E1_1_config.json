@@ -1,0 +1,129 @@
+{
+  "run_id": "E1_LOCAL__XGB_NOTEBOOK_FIXED__DIRECT__NO_NEIGHBOR__SEED42",
+  "algorithm": "xgboost",
+  "training_strategy": "local",
+  "forecast_strategy": "direct",
+  "spatial_mode": "none",
+  "include_station_id": false,
+  "include_region_id": false,
+  "elapsed_seconds": 2837.259938,
+  "naive_primary_macro_rmse": 10.942211775884056,
+  "fixed_params": {
+    "n_estimators": 2000,
+    "subsample": 0.65,
+    "reg_lambda": 3.0,
+    "reg_alpha": 0.1,
+    "min_child_weight": 5,
+    "max_depth": 8,
+    "learning_rate": 0.01,
+    "gamma": 0.5,
+    "colsample_bytree": 0.65
+  },
+  "params_by_horizon": {
+    "1": {
+      "n_estimators": 2000,
+      "subsample": 0.65,
+      "reg_lambda": 3.0,
+      "reg_alpha": 0.1,
+      "min_child_weight": 5,
+      "max_depth": 8,
+      "learning_rate": 0.01,
+      "gamma": 0.5,
+      "colsample_bytree": 0.65
+    },
+    "2": {
+      "n_estimators": 2000,
+      "subsample": 0.8,
+      "reg_lambda": 1.0,
+      "reg_alpha": 0.0,
+      "min_child_weight": 5,
+      "max_depth": 6,
+      "learning_rate": 0.01,
+      "gamma": 0.5,
+      "colsample_bytree": 0.65
+    },
+    "3": {
+      "n_estimators": 2000,
+      "subsample": 0.8,
+      "reg_lambda": 3.0,
+      "reg_alpha": 0.1,
+      "min_child_weight": 3,
+      "max_depth": 3,
+      "learning_rate": 0.03,
+      "gamma": 0.0,
+      "colsample_bytree": 0.65
+    },
+    "4": {
+      "n_estimators": 2000,
+      "subsample": 1.0,
+      "reg_lambda": 1.0,
+      "reg_alpha": 0.1,
+      "min_child_weight": 1,
+      "max_depth": 3,
+      "learning_rate": 0.1,
+      "gamma": 0.1,
+      "colsample_bytree": 0.65
+    },
+    "5": {
+      "n_estimators": 2000,
+      "subsample": 0.65,
+      "reg_lambda": 3.0,
+      "reg_alpha": 0.0,
+      "min_child_weight": 3,
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "gamma": 0.5,
+      "colsample_bytree": 0.8
+    },
+    "6": {
+      "n_estimators": 2000,
+      "subsample": 0.8,
+      "reg_lambda": 3.0,
+      "reg_alpha": 0.1,
+      "min_child_weight": 3,
+      "max_depth": 3,
+      "learning_rate": 0.03,
+      "gamma": 0.0,
+      "colsample_bytree": 0.65
+    },
+    "7": {
+      "n_estimators": 2000,
+      "subsample": 0.65,
+      "reg_lambda": 3.0,
+      "reg_alpha": 0.5,
+      "min_child_weight": 10,
+      "max_depth": 4,
+      "learning_rate": 0.1,
+      "gamma": 0.0,
+      "colsample_bytree": 0.65
+    }
+  },
+  "params_source": "best_params_t1.json ... best_params_t7.json",
+  "early_stopping_rounds": 100,
+  "test_naive_primary_macro_rmse": 5.656770448043223,
+  "python_version": "3.12.7",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "torch_version": "2.7.1+cu118",
+  "xgboost_version": "2.0.3",
+  "lightgbm_version": "4.7.0",
+  "sklearn_version": "1.9.1",
+  "cuda_version": "11.8",
+  "gpu_model": "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "device": "cuda",
+  "seed": 42,
+  "validation_start": "2025-11-19",
+  "test_start": "2026-04-13",
+  "evaluation_splits": [
+    "validation",
+    "test"
+  ],
+  "forecast_horizons": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ]
+}

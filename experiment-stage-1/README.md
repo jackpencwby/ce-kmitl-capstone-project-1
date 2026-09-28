@@ -15,15 +15,22 @@ run uses identical, frozen rules and only the one factor under test changes.
 | `E1_3.py` | E1.3 | Training = **Global + local tree residual** (OOF residuals) | XGB / Direct / No neighbor |
 | `E1_4.py` | E1.4 | Training = **Regional** (North/NE/Central/South by province) | XGB / Direct / No neighbor |
 | `E1_5.py` | E1.5 | Training = **Global + local MLP residual** (PyTorch) | XGB / Direct / No neighbor |
-| `E2_1.py` | E2.1 | Algorithm = **XGBoost** | Local / Direct / No neighbor |
-| `E2_2.py` | E2.2 | Algorithm = **LightGBM** (GPU build if available, else CPU) | Local / Direct / No neighbor |
-| `E2_3.py` | E2.3 | Algorithm = **GradientBoostingRegressor** (CPU only) | Local / Direct / No neighbor |
+| `E2_1.py` | E2.1 | Algorithm = **XGBoost** | Global / Direct / No neighbor |
+| `E2_2.py` | E2.2 | Algorithm = **LightGBM** (GPU build if available, else CPU) | Global / Direct / No neighbor |
+| `E2_3.py` | E2.3 | Algorithm = **GradientBoostingRegressor** (CPU only) | Global / Direct / No neighbor |
 | `E3_1.py` | E3.1 | Forecast = **Direct** (7 models, one per horizon) | Local / XGB / No neighbor |
 | `E3_2.py` | E3.2 | Forecast = **Multi-output** (independent estimators on common complete-case rows) | Local / XGB / No neighbor |
 | `E4_1.py` | E4.1 | Spatial = **No neighbor** | Local / XGB / Direct |
 | `E4_2.py` | E4.2 | Spatial = **Unweighted neighbor** mean | Local / XGB / Direct |
 | `E4_3.py` | E4.3 | Spatial = **Distance-weighted** (1/(d+ε)) | Local / XGB / Direct |
 | `E4_4.py` | E4.4 | Spatial = **Wind + distance** weighted | Local / XGB / Direct |
+
+E2.1-E2.3 pool all eligible stations with station identity as a feature,
+like E1.2, producing seven shared models per algorithm per fit (t+1 through t+7).
+`--stations` restricts both the training pool and scoring; use the default
+`--stations all` for all eligible stations. E2 uses independent parameters from `common/config_e2.py`
+and keeps separate validation/test fits. Older `E2_LOCAL` runs are not directly
+comparable with the new `E2_GLOBAL` runs.
 
 ## Command-line flags (shared by every script)
 
@@ -121,7 +128,7 @@ calendar days within the same station and segment. E4 also adds neighbor
 features. Old artifacts use a different split and feature set; rerun all
 comparisons on the new configuration.
 
-Every XGBoost experiment in E1–E4 uses `params` and
+XGBoost experiments in E1, E3 and E4 use `params` and
 `full_model_params.n_estimators` from `best_params_t{h}.json` for horizon `h`.
 The files currently specify a 2,000-tree ceiling. E1.1 fits one model per
 station and horizon, using
@@ -140,7 +147,7 @@ use the same per-horizon XGBoost parameters on out-of-fold residuals; auxiliary
 out-of-fold fits use the tail of their own training window for early stopping,
 with a horizon-length target cutoff. All E1 test predictions reuse the models
 selected before test, including any local residual correctors.
-E2–E4 XGBoost runs use the same per-horizon parameters without early stopping.
+E3 and E4 XGBoost runs use the same per-horizon parameters without early stopping.
 Their test models are fitted again on train plus validation data. E3.2 fits
 independent horizon estimators on rows with all seven targets available.
 
@@ -206,3 +213,43 @@ has only headers and `training_curve.png` states that no history was recorded.
   predictions within the fit period for training residuals; the MLP's scaler is fit on training
   rows only, with early stopping and a per-station fallback to residual = 0
   when a station has too few rows.
+
+### Independent E2 parameter profile
+
+To continue an interrupted E2.3 run after validation has been saved, run
+`python experiment-stage-1/resume_e2_3_test.py <existing-run-directory>` from
+the repository root. Add `--check-only` to verify the dataset hash, station
+cohort, feature list, parameters and sklearn version without training.
+This CPU-only runner fits test models on train plus validation, saves one
+checkpoint per completed horizon in `test_checkpoints/`, and writes test
+artifacts into the existing directory while retaining validation artifacts.
+Progress and failures are recorded in `test_resume_status.json`. Repeating
+the command reuses completed horizon checkpoints; an interrupted horizon
+starts again. Do not start concurrent resume processes for the same run.
+The resume runner defaults to `--workers 2`, fitting two independent horizons
+in separate CPU processes. Use `--workers 1` for sequential execution or raise
+the count when RAM permits. Each worker limits numerical-library threads to one;
+the parent aggregates checkpoints in horizon order once all workers finish.
+Progress JSON files (`test_checkpoints/h*_progress.json`) update after every
+boosting tree. Console logs print the first tree, every 10 trees and the final
+tree; use `--log-every N` to change this interval. Logs include per-horizon
+tree counts/percentages, overall training percentage and an approximate
+per-horizon training ETA. The parent refreshes `test_resume_status.json` every
+5 seconds. Percentages count trees across seven models, not wall time;
+100% training still requires predictions and artifact export to finish.
+Instrumentation takes effect in newly started processes, not existing workers.
+
+The pooled holdout path now respects the requested evaluation masks.
+Earlier pooled test outputs produced by a version that recomputed validation
+masks inside `_run_pooled` must be regenerated because they scored validation
+instead of test.
+
+E2 uses `common/config_e2.py` for all algorithms and horizons, selected by
+`parameter_profile="e2"`. Each algorithm uses 1,000 trees, learning rate 0.05,
+max depth 5 and row/feature sampling 0.8. LightGBM uses 31 leaves and
+`subsample_freq=1` to enable row sampling. See the config for leaf-size and
+regularization settings. The runner records the profile, source and parameters.
+E1 parameters and training policy remain unchanged. Previous E2 parameter
+settings differ, so rerun comparisons. E2 currently fits a fixed 1,000 rounds
+without early stopping; temporal round selection is not implemented by this
+parameter-only change.

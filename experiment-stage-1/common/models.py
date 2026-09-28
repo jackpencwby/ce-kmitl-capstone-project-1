@@ -26,7 +26,7 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from . import config, features, metrics, splits
+from . import config, config_e2, features, metrics, splits
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,9 +39,11 @@ def _record(records, estimator, group, horizon, role="main"):
 # ---------------------------------------------------------------------------
 # Estimator factories (fixed reasonable defaults, plan section 5 & 11)
 # ---------------------------------------------------------------------------
-def make_xgb(prefer_gpu: bool = True, horizon: int = 1):
+def make_xgb(prefer_gpu: bool = True, horizon: int = 1, parameter_profile: str = "default"):
     import xgboost as xgb
-    params = config.xgb_params_for_horizon(horizon)
+    params = (config_e2.params_for("xgboost") if parameter_profile == "e2"
+              else config.xgb_params_for_horizon(horizon))
+    params.setdefault("objective", "reg:squarederror")
     device = "cpu"
     tree_method = "hist"
     if prefer_gpu:
@@ -52,7 +54,6 @@ def make_xgb(prefer_gpu: bool = True, horizon: int = 1):
         except Exception:  # noqa: BLE001
             device = "cpu"
     return xgb.XGBRegressor(
-        objective="reg:squarederror",
         tree_method=tree_method,
         device=device,
         random_state=config.SEED,
@@ -111,12 +112,13 @@ def _lgbm_gpu_supported() -> bool:
     return _LGBM_GPU_SUPPORTED
 
 
-def make_lgbm(prefer_gpu: bool = True):
+def make_lgbm(prefer_gpu: bool = True, parameter_profile: str = "default"):
     import lightgbm as lgb
-    params = config.LGBM_PARAMS.as_dict()
+    params = (config_e2.params_for("lightgbm") if parameter_profile == "e2"
+              else config.LGBM_PARAMS.as_dict())
+    params.setdefault("objective", "regression")
     device_type = "gpu" if (prefer_gpu and _lgbm_gpu_supported()) else "cpu"
     return lgb.LGBMRegressor(
-        objective="regression",
         random_state=config.SEED,
         n_jobs=-1,
         device_type=device_type,
@@ -125,11 +127,12 @@ def make_lgbm(prefer_gpu: bool = True):
     )
 
 
-def make_gbr(prefer_gpu: bool = True):  # GBR is CPU-only regardless.
+def make_gbr(prefer_gpu: bool = True, parameter_profile: str = "default"):  # GBR is CPU-only regardless.
     from sklearn.ensemble import GradientBoostingRegressor
     from sklearn.impute import SimpleImputer
     from sklearn.pipeline import make_pipeline
-    params = config.GBR_PARAMS.as_dict()
+    params = (config_e2.params_for("gbr") if parameter_profile == "e2"
+              else config.GBR_PARAMS.as_dict())
     return make_pipeline(
         SimpleImputer(strategy="constant", fill_value=-999.0,
                       keep_empty_features=True),
@@ -157,7 +160,9 @@ class RunSpec:
     prefer_gpu: bool = True
     include_station_id: bool = False    # global/regional add station_id feature
     include_region_id: bool = False     # regional adds region_id feature
+    parameter_profile: str = "default"  # e2 selects independent screening parameters
     baseline_xgb: bool = False          # E1 shared XGBoost recipe + early stopping
+    gbr_monitor: Callable | None = field(default=None, repr=False, compare=False)
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +182,17 @@ def _fit_predict_estimator(
     y_val: pd.Series | None = None,
     train_dates: pd.Series | None = None,
     horizon: int = 0,
+    gbr_monitor: Callable | None = None,
 ) -> tuple[np.ndarray, object]:
     """Fit a fresh estimator on training rows, predict validation rows."""
     est = factory(prefer_gpu=prefer_gpu)
+    if gbr_monitor is not None:
+        step_name, regressor = est.steps[-1]
+        from sklearn.ensemble import GradientBoostingRegressor
+        if not isinstance(regressor, GradientBoostingRegressor):
+            raise ValueError("GBR progress monitor requires GradientBoostingRegressor")
+        est.fit(X_tr, y_tr, **{f"{step_name}__monitor": gbr_monitor})
+        return est.predict(X_val), est
     if y_val is None:
         if getattr(est, "early_stopping_rounds", None):
             used_internal_eval = False
@@ -284,6 +297,7 @@ def _fit_partition(
         yhat, est = _fit_predict_estimator(
             _horizon_factory(factory, h), spec.prefer_gpu, tr[feature_cols], tr[tcol], va[feature_cols],
             va[tcol] if spec.baseline_xgb else None,
+            gbr_monitor=spec.gbr_monitor,
         )
         if model_records is not None:
             _record(model_records, est, group, h)
@@ -333,7 +347,13 @@ def run_holdout(spec: RunSpec, df: pd.DataFrame, stations: list,
     Returns predictions, reports, feature importances, and the feature list.
     Dispatches on spec.training_strategy.
     """
+    if spec.parameter_profile not in ("default", "e2"):
+        raise ValueError(f"Unknown parameter profile: {spec.parameter_profile}")
+    if spec.parameter_profile == "e2" and spec.baseline_xgb:
+        raise ValueError("E2 parameters cannot be combined with the E1 baseline policy")
     factory = make_baseline_xgb if spec.baseline_xgb else ESTIMATOR_FACTORIES[spec.algorithm]
+    if spec.parameter_profile == "e2":
+        factory = partial(factory, parameter_profile="e2")
     feature_cols = assemble_feature_columns(spec)
     masks = splits.date_masks(df)
 
@@ -451,8 +471,8 @@ def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
         groups = list(df2.groupby("region_id"))
 
     for gname, gdf in groups:
-        gmasks = splits.date_masks(gdf)
-        tr, va = gdf[gmasks["train"]], gdf[gmasks["validation"]]
+        tr = gdf.loc[masks["train"].reindex(gdf.index)]
+        va = gdf.loc[masks["validation"].reindex(gdf.index)]
         preds, imps = _fit_partition(spec, factory, tr, va, cols,
                                      records, str(gname))
         all_preds.append(preds)

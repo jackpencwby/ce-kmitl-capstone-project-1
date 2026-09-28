@@ -79,9 +79,9 @@
 | `E1_3.py` | E1.3 | Training = **Global + local tree residual** | XGB / Direct / ไม่ใช้เพื่อนบ้าน |
 | `E1_4.py` | E1.4 | Training = **Regional** (แบ่งภาค เหนือ/อีสาน/กลาง/ใต้) | XGB / Direct / ไม่ใช้เพื่อนบ้าน |
 | `E1_5.py` | E1.5 | Training = **Global + local MLP residual** (PyTorch) | XGB / Direct / ไม่ใช้เพื่อนบ้าน |
-| `E2_1.py` | E2.1 | Algorithm = **XGBoost** | Local / Direct / ไม่ใช้เพื่อนบ้าน |
-| `E2_2.py` | E2.2 | Algorithm = **LightGBM** (GPU ถ้ารองรับ ไม่งั้น CPU) | Local / Direct / ไม่ใช้เพื่อนบ้าน |
-| `E2_3.py` | E2.3 | Algorithm = **GradientBoostingRegressor** (CPU) | Local / Direct / ไม่ใช้เพื่อนบ้าน |
+| `E2_1.py` | E2.1 | Algorithm = **XGBoost** | Global / Direct / ไม่ใช้เพื่อนบ้าน |
+| `E2_2.py` | E2.2 | Algorithm = **LightGBM** (GPU ถ้ารองรับ ไม่งั้น CPU) | Global / Direct / ไม่ใช้เพื่อนบ้าน |
+| `E2_3.py` | E2.3 | Algorithm = **GradientBoostingRegressor** (CPU) | Global / Direct / ไม่ใช้เพื่อนบ้าน |
 | `E3_1.py` | E3.1 | Forecast = **Direct** (7 โมเดล แยก horizon) | Local / XGB / ไม่ใช้เพื่อนบ้าน |
 | `E3_2.py` | E3.2 | Forecast = **Multi-output** (โมเดลเดียว 7 ค่า) | Local / XGB / ไม่ใช้เพื่อนบ้าน |
 | `E4_1.py` | E4.1 | Spatial = **ไม่ใช้เพื่อนบ้าน** | Local / XGB / Direct |

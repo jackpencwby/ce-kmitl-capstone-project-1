@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import artifacts, config, data, features, metrics, models, splits
+from . import artifacts, config, config_e2, data, features, metrics, models, splits
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +59,7 @@ def describe(spec: models.RunSpec, df: pd.DataFrame, stations: list) -> str:
     lines = [
         f"Run id            : {spec.run_id}",
         f"Algorithm         : {spec.algorithm}",
+        f"Parameter profile : {spec.parameter_profile}",
         f"Training strategy : {spec.training_strategy}",
         f"Forecast strategy : {spec.forecast_strategy}",
         f"Spatial mode      : {spec.spatial_mode}",
@@ -136,15 +137,18 @@ def execute(spec: models.RunSpec, args) -> int:
         "include_region_id": spec.include_region_id,
         "elapsed_seconds": elapsed,
         "naive_primary_macro_rmse": naive_reports["overall"]["macro"].get("primary_macro_rmse"),
-        "fixed_params": ({"xgboost": config.xgb_params_for_horizon(1),
+        "parameter_profile": spec.parameter_profile,
+        "fixed_params": (config_e2.params_for(spec.algorithm) if spec.parameter_profile == "e2" else {"xgboost": config.xgb_params_for_horizon(1),
             "lightgbm": config.LGBM_PARAMS.as_dict(),
             "gbr": config.GBR_PARAMS.as_dict(),
         }.get(spec.algorithm, {})),
-        "params_by_horizon": ({str(h): config.xgb_params_for_horizon(h)
+        "params_by_horizon": ({str(h): (config_e2.params_for(spec.algorithm) if spec.parameter_profile == "e2"
+                                        else config.xgb_params_for_horizon(h))
                                for h in config.FORECAST_HORIZONS}
-                              if spec.algorithm == "xgboost" else {}),
-        "params_source": ("best_params_t1.json ... best_params_t7.json"
-                          if spec.algorithm == "xgboost" else None),
+                              if spec.algorithm == "xgboost" or spec.parameter_profile == "e2" else {}),
+        "params_source": ("common/config_e2.py" if spec.parameter_profile == "e2" else
+                          ("best_params_t1.json ... best_params_t7.json"
+                           if spec.algorithm == "xgboost" else None)),
         "early_stopping_rounds": (config.BASELINE_EARLY_STOPPING_ROUNDS
                                   if spec.baseline_xgb else None),
     }
