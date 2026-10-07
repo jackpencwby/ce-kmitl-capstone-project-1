@@ -34,3 +34,4 @@ __pycache__/
 .env
 
 /experiment-stage-1/artifacts/
+/experiment-stage-2/artifacts/
