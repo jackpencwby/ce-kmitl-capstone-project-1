@@ -4,17 +4,23 @@ Stage 2 implements the four rows in `experiment-stage-2 - Sheet1.csv`:
 
 | ID | Scope | Forecast strategy |
 |---|---|---|
-| 1 | Global | Single head / direct: one LightGBM estimator for each t+1...t+7 target |
-| 2 | Global | Multiple head: seven horizon estimators trained on the same complete-seven-target cohort |
-| 3 | Regional | Single head / direct |
-| 4 | Regional | Multiple head |
+| 1 | Global | Single-output / direct: one LightGBM estimator for each t+1...t+7 target |
+| 2 | Global | Multi-output: one forecaster accepts seven targets and returns t+1...t+7 together |
+| 3 | Regional | Single-output / direct |
+| 4 | Regional | Multi-output |
 
 The shared Stage 1 code remains the source of truth for feature engineering,
 target construction, station eligibility, regional mapping, time splits,
 metrics, and artifact formats. Stage 2 adds a reproducible random search over
 the supplied LightGBM grid. It samples unique combinations; the complete grid
-contains 13,500,000 candidates, so exhaustive search is deliberately not the
+contains 16,200,000 candidates, so exhaustive search is deliberately not the
 default.
+
+For E2/E4, the forecaster is `MultiOutputRegressor(LGBMRegressor)`: callers fit
+one object with a seven-column target matrix and receive a seven-column
+prediction matrix in one call. LightGBM does not natively fit a vector-valued
+target, so this sklearn wrapper owns one LightGBM estimator per output under
+the hood; the estimators do not share tree parameters.
 
 ## CPU contract
 

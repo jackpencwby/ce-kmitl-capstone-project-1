@@ -3,10 +3,10 @@
 
 The four experiments defined in ``experiment-stage-2 - Sheet1.csv`` are:
 
-1. Global model + direct (one target/horizon per estimator)
-2. Global model + multi-head (seven targets trained on the same complete-target cohort)
-3. Regional models + direct
-4. Regional models + multi-head
+1. Global single-output forecasting (one target/horizon per estimator)
+2. Global multi-output forecasting (one forecaster returns t+1...t+7 together)
+3. Regional single-output forecasting
+4. Regional multi-output forecasting
 
 Hyperparameters are sampled without replacement from the supplied finite grid.
 Trials use the validation holdout only.  The selected configuration is then
@@ -32,6 +32,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import ParameterSampler
+from sklearn.multioutput import MultiOutputRegressor
 
 
 # Stage 2 intentionally reuses Stage 1's frozen data contract, causal feature
@@ -62,10 +63,10 @@ HYPERPARAMETER_GRID: dict[str, list[Any]] = {
 GRID_SIZE = math.prod(len(values) for values in HYPERPARAMETER_GRID.values())
 
 EXPERIMENTS = {
-    1: dict(scope="global", forecast="direct", label="GLOBAL__SINGLE_HEAD"),
-    2: dict(scope="global", forecast="multi", label="GLOBAL__MULTI_HEAD"),
-    3: dict(scope="regional", forecast="direct", label="REGIONAL__SINGLE_HEAD"),
-    4: dict(scope="regional", forecast="multi", label="REGIONAL__MULTI_HEAD"),
+    1: dict(scope="global", forecast="direct", label="GLOBAL__SINGLE_OUTPUT"),
+    2: dict(scope="global", forecast="multi", label="GLOBAL__MULTI_OUTPUT"),
+    3: dict(scope="regional", forecast="direct", label="REGIONAL__SINGLE_OUTPUT"),
+    4: dict(scope="regional", forecast="multi", label="REGIONAL__MULTI_OUTPUT"),
 }
 
 
@@ -146,7 +147,7 @@ def make_spec(experiment: int) -> models.RunSpec:
         prefer_gpu=False,
         include_station_id=True,
         include_region_id=(scope == "regional"),
-        # Multi-head uses a complete seven-target cohort, as in Stage 1 E3.2.
+        # Multi-output fitting needs one complete seven-target row per sample.
         complete_target_evaluation=(setting["forecast"] == "multi"),
     )
 
@@ -159,6 +160,89 @@ def _evaluation_masks(df: pd.DataFrame, evaluation: str) -> dict[str, pd.Series]
     elif evaluation != "validation":
         raise ValueError(f"Unknown evaluation split: {evaluation}")
     return masks
+
+
+def _multi_output_partition(
+    spec: models.RunSpec,
+    params: dict[str, Any],
+    train_frame: pd.DataFrame,
+    validation_frame: pd.DataFrame,
+    feature_columns: list[str],
+    group_name: str,
+) -> tuple[pd.DataFrame, list[pd.DataFrame], list[dict[str, Any]]]:
+    """Fit one multi-output forecaster and return its seven-horizon predictions.
+
+    LightGBM's sklearn regressor accepts one target at a time.  The
+    ``MultiOutputRegressor`` wrapper gives Stage 2 one forecasting object with
+    a seven-column target/prediction interface.  Its fitted LightGBM estimators
+    are deliberately kept inside that single wrapper rather than being fitted
+    in a horizon loop by this experiment.
+    """
+    target_columns = [f"target_t{h}" for h in config.FORECAST_HORIZONS]
+    id_columns = [config.STATION_ID_COL, config.DATE_COL]
+    max_horizon = max(config.FORECAST_HORIZONS)
+    boundary = (
+        pd.Timestamp(spec.evaluation_end)
+        if spec.evaluation_end
+        else pd.Timestamp(config.TEST_START)
+        if validation_frame[config.DATE_COL].min() < pd.Timestamp(config.TEST_START)
+        else pd.Timestamp.max
+    )
+    train_label_end = (
+        pd.Timestamp(spec.evaluation_start)
+        if spec.evaluation_start
+        else validation_frame[config.DATE_COL].min()
+    )
+
+    train_rows = train_frame.dropna(subset=target_columns)
+    train_rows = train_rows[
+        train_rows[config.DATE_COL] + pd.Timedelta(days=max_horizon) < train_label_end
+    ]
+    validation_rows = validation_frame.dropna(subset=target_columns)
+    validation_rows = validation_rows[
+        validation_rows[config.DATE_COL] + pd.Timedelta(days=max_horizon) < boundary
+    ]
+    if train_rows.empty or validation_rows.empty:
+        return (
+            pd.DataFrame(columns=id_columns + ["horizon", "y_true", "y_pred"]),
+            [],
+            [],
+        )
+
+    forecaster = MultiOutputRegressor(make_cpu_lgbm(dict(params)), n_jobs=1)
+    forecaster.fit(train_rows[feature_columns], train_rows[target_columns])
+    prediction_matrix = np.asarray(forecaster.predict(validation_rows[feature_columns]))
+    if prediction_matrix.shape != (len(validation_rows), len(target_columns)):
+        raise RuntimeError(
+            "Multi-output forecaster returned an unexpected prediction shape: "
+            f"{prediction_matrix.shape}; expected "
+            f"({len(validation_rows)}, {len(target_columns)})"
+        )
+
+    prediction_blocks: list[pd.DataFrame] = []
+    importances: list[pd.DataFrame] = []
+    for output_index, horizon in enumerate(config.FORECAST_HORIZONS):
+        block = validation_rows[id_columns].copy()
+        block["horizon"] = horizon
+        block["y_true"] = validation_rows[target_columns[output_index]].to_numpy()
+        block["y_pred"] = prediction_matrix[:, output_index]
+        prediction_blocks.append(block)
+
+        estimator = forecaster.estimators_[output_index]
+        importance = models._importance_frame(estimator, feature_columns, f"output_t{horizon}")
+        if not importance.empty:
+            importance["group"] = str(group_name)
+            importances.append(importance)
+
+    record = {
+        "estimator": forecaster,
+        "group": str(group_name),
+        "horizon": 0,
+        "role": "multi_output",
+        "feature_columns": feature_columns,
+        "target_columns": target_columns,
+    }
+    return pd.concat(prediction_blocks, ignore_index=True), importances, [record]
 
 
 def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
@@ -183,10 +267,17 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
     for group_name, group_frame in groups:
         train_frame = group_frame.loc[masks["train"].reindex(group_frame.index)]
         validation_frame = group_frame.loc[masks["validation"].reindex(group_frame.index)]
-        group_predictions, group_importances = models._fit_partition(
-            eval_spec, factory, train_frame, validation_frame, feature_columns,
-            records, str(group_name),
-        )
+        if eval_spec.forecast_strategy == "multi":
+            group_predictions, group_importances, group_records = _multi_output_partition(
+                eval_spec, params, train_frame, validation_frame,
+                feature_columns, str(group_name),
+            )
+            records.extend(group_records)
+        else:
+            group_predictions, group_importances = models._fit_partition(
+                eval_spec, factory, train_frame, validation_frame, feature_columns,
+                records, str(group_name),
+            )
         predictions.append(group_predictions)
         for importance in group_importances:
             if not importance.empty:
@@ -304,9 +395,10 @@ def main() -> int:
     validation_pair = write_persistence_comparison(
         run_dir, "validation", validation_result["predictions"], validation_rows
     )
+    output_mode = "multi-output" if spec.forecast_strategy == "multi" else "single-output/direct"
     description = (
         f"Stage 2 experiment {args.experiment}: {EXPERIMENTS[args.experiment]['scope']} LightGBM "
-        f"with {EXPERIMENTS[args.experiment]['forecast']} prediction strategy; CPU training. "
+        f"with {output_mode} forecasting; CPU training. "
         "Parameters were selected by validation primary macro RMSE from the supplied grid."
     )
     run_config = {
@@ -315,8 +407,13 @@ def main() -> int:
         "scope": EXPERIMENTS[args.experiment]["scope"],
         "algorithm": "lightgbm",
         "training_strategy": spec.training_strategy,
-        "forecast_strategy": spec.forecast_strategy,
-        "prediction_head": "multiple" if spec.forecast_strategy == "multi" else "single",
+        "forecast_strategy": "multi_output" if spec.forecast_strategy == "multi" else "direct",
+        "prediction_output": "multi_output" if spec.forecast_strategy == "multi" else "single_output",
+        "multi_output_implementation": (
+            "sklearn.multioutput.MultiOutputRegressor(LGBMRegressor): one forecaster "
+            "object accepts seven targets and returns seven predictions."
+            if spec.forecast_strategy == "multi" else None
+        ),
         "spatial_mode": "none",
         "include_station_id": True,
         "include_region_id": spec.include_region_id,
