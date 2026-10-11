@@ -1,0 +1,13 @@
+D:\Data\pm25_forcast_tft\ce-kmitl-capstone-project-1\.venv\Lib\site-packages\xgboost\core.py:569: UserWarning: [06:56:58] WARNING: C:\actions-runner\_work\xgboost\xgboost\src\common\error_msg.cc:62: Falling back to prediction using DMatrix due to mismatched devices. This might lead to higher memory usage and slower performance. XGBoost is running on: cuda:0, while the input data is on: cpu.
+Potential solutions:
+- Use a data structure that matches the device ordinal in the booster.
+- Set the device for booster before call to inplace_predict.
+
+This warning will only be shown once.
+
+  return func(**kwargs)
+2026-10-11 06:56:58,986 INFO [common.data] Reading master table from D:\Data\pm25_forcast_tft\ce-kmitl-capstone-project-1\clean-data_preprocess-09-19_all_stations_daily.csv
+2026-10-11 06:57:16,183 INFO [stage2] Output: D:\Data\pm25_forcast_tft\ce-kmitl-capstone-project-1\experiment-stage-2\artifacts\S2_2__GLOBAL_MULTI_HEAD__XGB_CUDA__SEED42__20261010_235716; groups=['global']; fits per candidate=1
+2026-10-11 09:46:21,277 INFO [common.artifacts] Saved artifacts to D:\Data\pm25_forcast_tft\ce-kmitl-capstone-project-1\experiment-stage-2\artifacts\S2_2__GLOBAL_MULTI_HEAD__XGB_CUDA__SEED42__20261010_235716
+2026-10-11 09:46:23,043 INFO [common.artifacts] Saved artifacts to D:\Data\pm25_forcast_tft\ce-kmitl-capstone-project-1\experiment-stage-2\artifacts\S2_2__GLOBAL_MULTI_HEAD__XGB_CUDA__SEED42__20261010_235716
+2026-10-11 09:46:23,130 INFO [stage2] Completed Stage 2 experiment 2; validation primary macro RMSE=9.641120; test primary macro RMSE=4.608589

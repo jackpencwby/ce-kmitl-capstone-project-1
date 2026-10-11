@@ -1,0 +1,4 @@
+Waiting for E2_1 process 39524 at 2026-10-11T04:34:00.8084144+07:00
+Starting Tawan_E2_2_global_multi_head.py at 2026-10-11T06:56:50.4984477+07:00
+Finished Tawan_E2_2_global_multi_head.py with exit code  at 2026-10-11T09:46:25.1818421+07:00
+Starting Tawan_E2_7_regional_single_head.py at 2026-10-11T09:46:25.1941053+07:00

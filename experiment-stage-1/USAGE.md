@@ -194,9 +194,13 @@ exact 70/15/15 proportions at those fixed dates. Re-run comparisons.
 | `feature_importance.csv` | ความสำคัญของ feature |
 | `training_log.txt` | log สรุปของ run |
 
-ทุก experiment ที่ใช้ XGBoost อ่านพารามิเตอร์แยกตาม horizon จาก
-`best_params_t1.json` ถึง `best_params_t7.json` ใน `experiment-stage-1`
-(ไม่สุ่มค้นหา hyperparameter ระหว่างการรัน) ส่วน LightGBM/GBR ใช้พารามิเตอร์ของตนเอง
+E1_1–E1_5 ใช้ XGBoost base recipe คงที่ชุดเดียวกันจาก `common/config.py` ทุก
+strategy และทุก horizon: learning rate 0.05, depth 5, min child weight 20,
+subsample/colsample 0.8, alpha 0, lambda 1, gamma 0 และจำนวนต้นไม้สูงสุด
+2,000 (early stopping 100 รอบเลือกจำนวนจริงจาก validation) ส่วน E2–E4
+ยังคงใช้ policy พารามิเตอร์ของแต่ละ stage ตามที่ระบุใน config
+(E1 จะไม่อ่าน `best_params_t1.json` ถึง `best_params_t7.json` อีกต่อไป)
+โดย E1_5 ใช้ค่า MLP residual เพิ่มเติมจาก `MLP_PARAMS` ใน config เดียวกัน
 โมเดล XGBoost หลักฝึกได้สูงสุด 2,000 trees พร้อม early stopping 100 รอบ
 จาก validation แล้วใช้โมเดลที่เลือกไว้ประเมิน test โดยไม่ใช้ test เลือกพารามิเตอร์
 E1.1 ยังคงฝึกแยกรายสถานี × horizon ส่วน E1.2–E1.5 คงรูปแบบ global/regional/

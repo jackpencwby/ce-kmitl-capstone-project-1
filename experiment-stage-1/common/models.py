@@ -63,14 +63,14 @@ def make_xgb(prefer_gpu: bool = True, horizon: int = 1, parameter_profile: str =
 
 
 def make_baseline_xgb(prefer_gpu: bool = True, horizon: int = 1):
-    """XGBoost recipe selected for the given horizon, with early stopping."""
+    """Shared fixed E1 XGBoost recipe, with validation early stopping."""
     import xgboost as xgb
     device = make_xgb(prefer_gpu).get_params()["device"]
     return xgb.XGBRegressor(
         objective="reg:squarederror", eval_metric="rmse", tree_method="hist",
         device=device, random_state=config.SEED, n_jobs=4,
         early_stopping_rounds=config.BASELINE_EARLY_STOPPING_ROUNDS,
-        **config.xgb_params_for_horizon(horizon),
+        **config.e1_xgb_params_for_horizon(horizon),
     )
 
 
