@@ -27,7 +27,7 @@ def main() -> int:
     cli.configure_logging(args.log_level)
 
     spec = models.RunSpec(
-        run_id="E1_GLOBAL__XGB__DIRECT__NO_NEIGHBOR__SEED42",
+        run_id="E1_2_GLOBAL__XGB_FIXED_COMMON__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="global",
         forecast_strategy="direct",

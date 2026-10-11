@@ -150,7 +150,7 @@ def export(run_dir: Path, frame: pd.DataFrame, predictions: dict[str, pd.DataFra
     dataset_manifest = json.loads((run_dir / "dataset_manifest.json").read_text(encoding="utf-8"))
     selected = set(dataset_manifest["stations_used"])
     frame = frame[frame[config.STATION_ID_COL].astype(str).isin(selected)]
-    config_copy["notebook_output_schema"] = "xgboost_1to7_tuned"
+    config_copy["notebook_output_schema"] = "xgboost_1to7_fixed_common"
     config_copy["features"] = feature_list
     config_copy["horizons"] = list(config.FORECAST_HORIZONS)
     config_copy["source"] = dataset_manifest.get("master_local_path")

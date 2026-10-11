@@ -3,7 +3,7 @@
 
 Training strategy: one independent set of models per station.
 Fixed axes for E1: algorithm=XGBoost, forecast=Direct, spatial=No neighbor.
-This is the Stage 1 baseline: fixed notebook-inspired XGBoost parameters,
+This is the Stage 1 baseline: shared fixed XGBoost parameters,
 up to 2,000 trees and validation early stopping (100 rounds). It keeps the
 current 09-19 feature set and Stage 1 split dates, with no parameter search.
 
@@ -28,7 +28,7 @@ def main() -> int:
     cli.configure_logging(args.log_level)
 
     spec = models.RunSpec(
-        run_id="E1_LOCAL__XGB_NOTEBOOK_FIXED__DIRECT__NO_NEIGHBOR__SEED42",
+        run_id="E1_1_LOCAL__XGB_FIXED_COMMON__DIRECT__NO_NEIGHBOR__SEED42",
         algorithm="xgboost",
         training_strategy="local",
         forecast_strategy="direct",

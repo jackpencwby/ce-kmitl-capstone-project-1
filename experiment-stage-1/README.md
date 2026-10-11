@@ -112,7 +112,7 @@ Set once in `common/config.py` (plan section 3):
 - Horizons `t+1 … t+7`
 - E2–E4 execute 4 expanding walk-forward folds with a 7-day embargo; E1 retains its separate holdout policy
 - Weather-only stations (pm25 missing > 30% in training) are dropped as targets
-- XGBoost parameters selected per horizon from `best_params_t1.json` through `best_params_t7.json` (no search during Stage 1 runs)
+- E1 uses one shared fixed XGBoost recipe across strategies and horizons, with validation early stopping; E2–E4 retain their configured parameter-selection policies
 - LightGBM and GradientBoostingRegressor keep their own fixed parameters in `common/config.py`
 - Metrics: MAE, MSE, RMSE, R², Bias; primary = macro RMSE over station × horizon
 
@@ -128,14 +128,14 @@ calendar days within the same station and segment. E4 also adds neighbor
 features. Old artifacts use a different split and feature set; rerun all
 comparisons on the new configuration.
 
-XGBoost experiments in E1, E3 and E4 use `params` and
-`full_model_params.n_estimators` from `best_params_t{h}.json` for horizon `h`.
-The files currently specify a 2,000-tree ceiling. E1.1 fits one model per
-station and horizon, using
-100-round early stopping on validation. No parameter search runs during an
-experiment. The historical `best_iteration` and `prediction_trees` in the
-source files describe the earlier tuning runs; each new E1 fit selects its
-own best iteration.
+E1.1–E1.5 use the same fixed XGBoost base recipe from `common/config.py` for
+every strategy and horizon: 2,000 trees maximum, learning rate 0.05, depth 5,
+minimum child weight 20, row and column sampling 0.8, alpha 0, lambda 1,
+and gamma 0. Each fitted model selects its iteration with 100-round
+validation early stopping. The historical `best_params_t{h}.json` files are
+retained for the non-E1 experiments that use those recipes; they are not used
+by E1. E1.5 also uses the fixed MLP residual-corrector settings in
+`common/config.py`. No parameter search runs during an E1 experiment.
 Targets are looked up on the exact future date in the same station segment.
 The selected validation model is reused for test; test targets never enter
 early stopping. Its saved model manifest includes `best_iteration` and a

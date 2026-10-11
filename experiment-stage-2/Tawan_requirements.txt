@@ -1,0 +1,8 @@
+# Stage 2 requires an XGBoost build with CUDA and native multi_output_tree support.
+xgboost>=3.0
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+torch>=2.0
+boto3>=1.28
+pyarrow>=12.0

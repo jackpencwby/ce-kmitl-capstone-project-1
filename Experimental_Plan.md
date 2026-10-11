@@ -160,6 +160,13 @@ target_transform: raw
 hyperparameters: fixed_reasonable_defaults
 ```
 
+สำหรับ E1 ให้ใช้ XGBoost recipe ชุดเดียวกันทุก strategy และทุก horizon:
+`n_estimators=2000` (เพดานร่วม), `learning_rate=0.05`, `max_depth=5`,
+`min_child_weight=20`, `subsample=0.8`, `colsample_bytree=0.8`,
+`reg_alpha=0`, `reg_lambda=1`, `gamma=0`; ใช้ validation early stopping 100 รอบ
+เพื่อเลือกจำนวนต้นไม้ของแต่ละโมเดล ค่านี้เป็น screening baseline และไม่อ่าน
+พารามิเตอร์ที่ tune จาก Global model
+
 Baseline นี้หมายถึง
 
 - ฝึกโมเดลแยกสถานี

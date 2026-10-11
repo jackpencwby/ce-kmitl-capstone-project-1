@@ -217,9 +217,24 @@ class FixedMLPParams:
 BASELINE_EARLY_STOPPING_ROUNDS: Final[int] = 100
 SCREENING_EARLY_STOPPING_ROUNDS: Final[int] = 100
 
+# E1 compares training strategy, so every strategy and forecast horizon gets
+# this same a-priori XGBoost recipe. Tree count is a ceiling; each fitted model
+# selects its iteration from its own chronological validation tail.
+E1_XGB_PARAMS: Final[dict[str, int | float | str]] = {
+    "n_estimators": 2000,
+    "learning_rate": 0.05,
+    "max_depth": 5,
+    "min_child_weight": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.0,
+    "reg_lambda": 1.0,
+    "gamma": 0.0,
+}
+
 
 def xgb_params_for_horizon(horizon: int) -> dict:
-    """Load the selected XGBoost recipe for a forecast horizon."""
+    """Load the selected non-E1 XGBoost recipe for a forecast horizon."""
     if horizon not in FORECAST_HORIZONS:
         raise ValueError(f"Unsupported forecast horizon: {horizon}")
     path = STAGE1_DIR / f"best_params_t{horizon}.json"
@@ -230,6 +245,13 @@ def xgb_params_for_horizon(horizon: int) -> dict:
     if set(params) != expected:
         raise ValueError(f"Unexpected XGBoost parameters in {path}: {set(params) ^ expected}")
     return {"n_estimators": int(recipe["full_model_params"]["n_estimators"]), **params}
+
+
+def e1_xgb_params_for_horizon(horizon: int) -> dict:
+    """Return E1's shared, fixed XGBoost recipe for a valid horizon."""
+    if horizon not in FORECAST_HORIZONS:
+        raise ValueError(f"Unsupported forecast horizon: {horizon}")
+    return dict(E1_XGB_PARAMS)
 LGBM_PARAMS: Final[FixedLGBMParams] = FixedLGBMParams()
 GBR_PARAMS: Final[FixedGBRParams] = FixedGBRParams()
 MLP_PARAMS: Final[FixedMLPParams] = FixedMLPParams()

@@ -1,0 +1,22 @@
+[Stage 2 Preflight]
+Python: 3.12.10
+XGBoost: 3.4.1
+CUDA device: NVIDIA GeForce RTX 5070 Ti Laptop GPU
+CUDA training: PASS
+multi_output_tree: PASS
+Experiment: 2 / global
+Forecast strategy: multi
+Tuning: hierarchical-grid; early stopping rounds: 100
+Seed: 42
+[Stage 2 Preflight]
+Python: 3.12.10
+XGBoost: 3.4.1
+CUDA device: NVIDIA GeForce RTX 5070 Ti Laptop GPU
+CUDA training: PASS
+multi_output_tree: PASS
+Dataset: 184,637 rows; eligible stations: 218; features: 129; targets: 7
+Train: 120,121; Validation: 30,480; Test: 34,036
+Experiment: 2 / global
+Forecast strategy: multi
+Tuning: hierarchical-grid; early stopping rounds: 100
+Seed: 42

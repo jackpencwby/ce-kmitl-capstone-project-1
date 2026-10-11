@@ -192,16 +192,19 @@ def execute(spec: models.RunSpec, args) -> int:
         "spatial_config": asdict(config.SPATIAL) if spec.spatial_mode != 'none' else None,
         "naive_primary_macro_rmse": naive_reports["overall"]["macro"].get("primary_macro_rmse"),
         "parameter_profile": spec.parameter_profile,
-        "fixed_params": (config_e2.params_for(spec.algorithm) if spec.parameter_profile == "e2" else {"xgboost": config.xgb_params_for_horizon(1),
+        "fixed_params": (config_e2.params_for(spec.algorithm) if spec.parameter_profile == "e2" else {"xgboost": (config.e1_xgb_params_for_horizon(1) if spec.baseline_xgb else config.xgb_params_for_horizon(1)),
             "lightgbm": config.LGBM_PARAMS.as_dict(),
             "gbr": config.GBR_PARAMS.as_dict(),
         }.get(spec.algorithm, {})),
         "params_by_horizon": ({str(h): (config_e2.params_for(spec.algorithm) if spec.parameter_profile == "e2"
+                                        else config.e1_xgb_params_for_horizon(h) if spec.baseline_xgb
                                         else config.xgb_params_for_horizon(h))
                                for h in config.FORECAST_HORIZONS}
                               if spec.algorithm == "xgboost" or spec.parameter_profile == "e2" else {}),
         "params_source": ("common/config_e2.py" if spec.parameter_profile == "e2" else
-                          ("best_params_t1.json ... best_params_t7.json"
+                          ("common/config.py:E1_XGB_PARAMS (shared fixed recipe)"
+                           if spec.algorithm == "xgboost" and spec.baseline_xgb else
+                           "best_params_t1.json ... best_params_t7.json"
                            if spec.algorithm == "xgboost" else None)),
         "early_stopping_rounds": (config.BASELINE_EARLY_STOPPING_ROUNDS
                                   if spec.baseline_xgb else None),
