@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Stage 2 LightGBM tuning on CPU.
 
-The four experiments defined in ``experiment-stage-2 - Sheet1.csv`` are:
+The supported Stage 2 experiments are:
 
 1. Global single-output forecasting (one target/horizon per estimator)
 2. Global multi-output forecasting (one forecaster returns t+1...t+7 together)
 3. Regional single-output forecasting
 4. Regional multi-output forecasting
+15. Global + per-station tree residual correction, single-output
+16. Global + per-station tree residual correction, multi-output
 
 Hyperparameters are sampled without replacement from the supplied finite grid.
 Trials use the validation holdout only.  The selected configuration is then
@@ -67,6 +69,8 @@ EXPERIMENTS = {
     2: dict(scope="global", forecast="multi", label="GLOBAL__MULTI_OUTPUT"),
     3: dict(scope="regional", forecast="direct", label="REGIONAL__SINGLE_OUTPUT"),
     4: dict(scope="regional", forecast="multi", label="REGIONAL__MULTI_OUTPUT"),
+    15: dict(scope="global_local_tree", forecast="direct", label="GLOBAL_LOCAL_TREE__SINGLE_OUTPUT"),
+    16: dict(scope="global_local_tree", forecast="multi", label="GLOBAL_LOCAL_TREE__MULTI_OUTPUT"),
 }
 
 
@@ -245,6 +249,72 @@ def _multi_output_partition(
     return pd.concat(prediction_blocks, ignore_index=True), importances, [record]
 
 
+def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
+                        masks: dict[str, pd.Series], feature_columns: list[str],
+                        params: dict[str, Any]) -> dict[str, Any]:
+    """E1.3's global + station OOF residual method with vector-output wrappers."""
+    frame, feature_columns = models._add_categorical_codes(
+        frame, spec, feature_columns, masks["train"]
+    )
+    train = frame.loc[masks["train"]]
+    evaluation = frame.loc[masks["validation"]]
+    predictions, importances, records = _multi_output_partition(
+        spec, params, train, evaluation, feature_columns, "global"
+    )
+    if predictions.empty:
+        return models._finalize(spec, predictions, importances, feature_columns, records)
+
+    cutoff = pd.Timestamp(spec.evaluation_start)
+    folds = splits.residual_oof_folds(train, cutoff)
+    oof_parts = []
+    for fold in folds:
+        train_mask, valid_mask = splits.fold_masks(train, fold)
+        # Fold targets may extend beyond the fold's last origin, but never
+        # into the held-out evaluation period. Training labels must precede
+        # the first fold prediction origin.
+        fold_spec = replace(spec, evaluation_start=fold.valid_start.isoformat(),
+                            evaluation_end=cutoff.isoformat())
+        oof, _, _ = _multi_output_partition(
+            fold_spec, params, train.loc[train_mask], train.loc[valid_mask],
+            feature_columns, "global_oof"
+        )
+        if not oof.empty:
+            oof_parts.append(oof)
+
+    if oof_parts:
+        ids = [config.STATION_ID_COL, config.DATE_COL]
+        targets = [f"target_t{h}" for h in config.FORECAST_HORIZONS]
+        oof = pd.concat(oof_parts, ignore_index=True)
+        oof["residual"] = oof.y_true - oof.y_pred
+        residuals = oof.pivot(index=ids, columns="horizon", values="residual")
+        residuals = residuals.rename(columns={h: f"target_t{h}" for h in config.FORECAST_HORIZONS})
+        local_train = train.drop(columns=targets).merge(
+            residuals.reset_index(), on=ids, how="inner", validate="one_to_one"
+        ).dropna(subset=targets)
+        corrections = []
+        for station, station_train in local_train.groupby(config.STATION_ID_COL):
+            if len(station_train) < config.MLP_PARAMS.min_station_rows:
+                continue
+            station_eval = evaluation[evaluation[config.STATION_ID_COL] == station]
+            correction, local_importances, local_records = _multi_output_partition(
+                spec, params, station_train, station_eval, feature_columns, str(station)
+            )
+            for record in local_records:
+                record["role"] = "local_residual_multi_output"
+            records.extend(local_records)
+            importances.extend(local_importances)
+            if not correction.empty:
+                corrections.append(correction[ids + ["horizon", "y_pred"]])
+        if corrections:
+            correction_frame = pd.concat(corrections, ignore_index=True).rename(
+                columns={"y_pred": "residual_pred"}
+            )
+            predictions = predictions.merge(correction_frame, on=ids + ["horizon"],
+                                            how="left", validate="one_to_one")
+            predictions["y_pred"] += predictions.pop("residual_pred").fillna(0.)
+    return models._finalize(spec, predictions, importances, feature_columns, records)
+
+
 def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
                params: dict[str, Any], evaluation: str) -> dict[str, Any]:
     """Train pooled LightGBM models for one split using a supplied trial config."""
@@ -257,9 +327,13 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
         selection_patience=None,
     )
     base_columns = models.assemble_feature_columns(eval_spec)
+    factory = partial(make_cpu_lgbm, dict(params))
+    if eval_spec.training_strategy == "global_local_tree":
+        if eval_spec.forecast_strategy == "multi":
+            return _run_multi_residual(eval_spec, frame, masks, base_columns, params)
+        return models._run_residual(eval_spec, frame, factory, base_columns, masks)
     frame, feature_columns = models._add_categorical_codes(frame, eval_spec, base_columns, masks["train"])
     groups = [("global", frame)] if eval_spec.training_strategy == "global" else list(frame.groupby("region_id"))
-    factory = partial(make_cpu_lgbm, dict(params))
     predictions: list[pd.DataFrame] = []
     importances: list[pd.DataFrame] = []
     records: list[dict[str, Any]] = []
@@ -323,7 +397,12 @@ def save_split(run_dir: Path, spec: models.RunSpec, df: pd.DataFrame, stations: 
         run_config=run_config,
         df=df,
         stations=stations,
-        folds_manifest=pd.DataFrame(),
+        folds_manifest=(
+            splits.fold_manifest(splits.residual_oof_folds(
+                df[df[config.STATION_ID_COL].isin(stations)],
+                pd.Timestamp(config.TEST_START if split == "test" else config.VALIDATION_START),
+            )) if spec.training_strategy == "global_local_tree" else pd.DataFrame()
+        ),
         reports=result["reports"],
         predictions=result["predictions"],
         feature_list=result["feature_list"],
@@ -407,6 +486,12 @@ def main() -> int:
         "scope": EXPERIMENTS[args.experiment]["scope"],
         "algorithm": "lightgbm",
         "training_strategy": spec.training_strategy,
+        "local_correction": (
+            {"method": "out_of_fold_tree_residual", "group_by": config.STATION_ID_COL,
+             "min_station_rows": config.MLP_PARAMS.min_station_rows,
+             "fallback": "global_prediction", "parameter_policy": "same_trial_params_as_global"}
+            if spec.training_strategy == "global_local_tree" else None
+        ),
         "forecast_strategy": "multi_output" if spec.forecast_strategy == "multi" else "direct",
         "prediction_output": "multi_output" if spec.forecast_strategy == "multi" else "single_output",
         "multi_output_implementation": (

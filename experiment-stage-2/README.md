@@ -1,6 +1,6 @@
 # Experiment Stage 2 - CPU LightGBM tuning
 
-Stage 2 implements the four rows in `experiment-stage-2 - Sheet1.csv`:
+Stage 2 implements these experiment rows:
 
 | ID | Scope | Forecast strategy |
 |---|---|---|
@@ -8,6 +8,8 @@ Stage 2 implements the four rows in `experiment-stage-2 - Sheet1.csv`:
 | 2 | Global | Multi-output: one forecaster accepts seven targets and returns t+1...t+7 together |
 | 3 | Regional | Single-output / direct |
 | 4 | Regional | Multi-output |
+| 15 | Global + per-station tree residual correction | Single-output / direct |
+| 16 | Global + per-station tree residual correction | Multi-output |
 
 The shared Stage 1 code remains the source of truth for feature engineering,
 target construction, station eligibility, regional mapping, time splits,
@@ -16,11 +18,29 @@ the supplied LightGBM grid. It samples unique combinations; the complete grid
 contains 16,200,000 candidates, so exhaustive search is deliberately not the
 default.
 
-For E2/E4, the forecaster is `MultiOutputRegressor(LGBMRegressor)`: callers fit
+For experiments 2/4/16, the forecaster is `MultiOutputRegressor(LGBMRegressor)`: callers fit
 one object with a seven-column target matrix and receive a seven-column
 prediction matrix in one call. LightGBM does not natively fit a vector-valued
 target, so this sklearn wrapper owns one LightGBM estimator per output under
 the hood; the estimators do not share tree parameters.
+
+Experiments 15/16 follow Stage 1 `E1_3.py`: fit global models, generate
+walk-forward out-of-fold (OOF) predictions within the training period, then
+fit a separate LightGBM residual corrector per station. Final predictions
+are `global_prediction + local_residual_prediction`. Here, "finetune"
+means residual correction, rather than continued boosting of a global model.
+Experiment 15 reuses Stage 1's direct residual runner; experiment 16 fits
+seven-column target/residual matrices through multi-output wrappers at both
+levels. It requires complete seven-target rows, like experiment 2.
+
+OOF folds use the Stage 1 180-day warmup and embargo. Training target dates
+must precede the next evaluation origin; OOF residual labels must precede
+the holdout boundary. Stations with fewer than 120 usable OOF rows fall back
+to global predictions. Both levels use the same trial's LightGBM parameters;
+validation selects the combined predictor. Test refitting rebuilds global,
+OOF, and local models using train+validation only. OOF fold boundaries are
+saved with the artifacts. These runs cost more than global-only experiments
+because every trial also trains OOF and per-station models.
 
 ## CPU contract
 
@@ -49,6 +69,8 @@ available logical CPU cores by default:
 .venv\Scripts\python.exe experiment-stage-2\E2_2_global_multi_head.py --train --source gcs --n-trials 40
 .venv\Scripts\python.exe experiment-stage-2\E2_3_regional_single_head.py --train --source gcs --n-trials 40
 .venv\Scripts\python.exe experiment-stage-2\E2_4_regional_multi_head.py --train --source gcs --n-trials 40
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --train --source gcs --n-trials 40
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --train --source gcs --n-trials 40
 ```
 
 Tuning uses validation `primary_macro_rmse` only. The selected parameter set
