@@ -1,6 +1,6 @@
 """Stage 2 experiment 16: global + station LightGBM residuals, multi-output."""
 
-from run_stage2 import main
+from jack_run_stage2 import main
 
 
 if __name__ == "__main__":

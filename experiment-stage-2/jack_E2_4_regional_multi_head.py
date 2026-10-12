@@ -1,6 +1,6 @@
 """Stage 2 experiment 4: regional LightGBM with multi-output heads."""
 
-from run_stage2 import main
+from jack_run_stage2 import main
 
 
 if __name__ == "__main__":
