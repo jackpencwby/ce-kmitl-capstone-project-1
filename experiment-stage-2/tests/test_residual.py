@@ -11,7 +11,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import run_stage2 as stage2
+import jack_run_stage2 as stage2
 
 
 class MeanRegressor(RegressorMixin, BaseEstimator):
@@ -91,7 +91,8 @@ class ResidualTests(unittest.TestCase):
         # a forward OOF residual has positive mean because the past mean lags.
         locals_ = [(X, y) for X, y in MeanRegressor.fits
                    if X.x.min() >= 180 and X.x.max() < 366]
-        self.assertEqual(len(locals_), 14)
+        # One horizon-stacked multi-head fit per station (previously 7 wrapper estimators each).
+        self.assertEqual(len(locals_), 2)
         self.assertTrue(all(float(y.mean()) > 0 for _, y in locals_))
 
     def test_multi_output_excludes_incomplete_target_rows(self):
