@@ -28,6 +28,23 @@ class MeanRegressor(RegressorMixin, BaseEstimator):
 
 
 class ResidualTests(unittest.TestCase):
+    def test_gpu_device_reaches_every_global_oof_and_local_fit(self):
+        calls = []
+
+        def factory(params, **kwargs):
+            calls.append(params['device_type'])
+            return MeanRegressor()
+
+        with patch.object(stage2, 'make_cpu_lgbm', factory):
+            for experiment in [15, 16]:
+                calls.clear()
+                spec = stage2.make_spec(experiment, device='gpu')
+                result = stage2.run_pooled(spec, self.frame, [1, 2], {}, 'validation', budget=2)
+                self.assertTrue(any(r['role'].startswith('local_residual')
+                                    for r in result['model_records']))
+                self.assertGreater(len(calls), len(result['model_records']))
+                self.assertEqual(set(calls), {'gpu'})
+
     def setUp(self):
         self.frame = pd.concat([
             pd.DataFrame({'station_id': sid, 'date': pd.date_range('2024-01-01', periods=450),

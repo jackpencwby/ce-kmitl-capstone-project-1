@@ -16,8 +16,9 @@ finite domain.  The full Cartesian product (16.2M combinations) is infeasible,
 so the grid is walked in three phases (structure -> regularization -> local
 refinement) with successive-halving style pruning.  Trials use the validation
 holdout only.  The selected configuration is then refit on train+validation and
-evaluated exactly once on the locked test split.  LightGBM is explicitly
-configured with ``device_type='cpu'`` for a portable Windows training workflow.
+evaluated exactly once on the locked test split. Use ``--device gpu`` for the
+OpenCL backend on Windows or ``--device cpu`` for CPU training. The selected
+backend must pass preflight; failures do not silently switch devices.
 
 Multi-output ("multiple prediction head") means ONE LightGBM model.  LightGBM
 has no vector-leaf trees, so the seven targets are stacked into a long table
@@ -35,7 +36,7 @@ import math
 import random
 import sys
 import warnings
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
@@ -58,6 +59,19 @@ from common import artifacts, config, data, metrics, models, runner, splits  # n
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class Stage2RunSpec(models.RunSpec):
+    gpu_platform_id: int = -1
+    gpu_device_id: int = -1
+
+
+def _device_params(device: str, platform_id: int = -1, device_id: int = -1) -> dict[str, Any]:
+    params = {"device_type": device}
+    if device == "gpu":
+        params.update(gpu_platform_id=platform_id, gpu_device_id=device_id)
+    return params
 
 # Allowed parameter domain (the supplied LightGBM hyperparameters).
 HYPERPARAMETER_GRID: dict[str, list[Any]] = {
@@ -115,6 +129,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--experiment", choices=sorted(EXPERIMENTS), type=int, required=True)
     parser.add_argument("--train", action="store_true", help="Run tuning and write artifacts.")
     parser.add_argument("--source", choices=["auto", "local", "gcs"], default="auto")
+    parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu",
+                        help="LightGBM backend; gpu uses OpenCL on Windows and requires a GPU-enabled build.")
+    parser.add_argument("--gpu-platform-id", type=int, default=-1, help="OpenCL platform index (-1: automatic).")
+    parser.add_argument("--gpu-device-id", type=int, default=-1, help="OpenCL device index (-1: automatic).")
     parser.add_argument("--stations", nargs="+", default=["all"])
     parser.add_argument("--max-stations", type=int, default=None)
     parser.add_argument("--seed", "--random-seed", dest="seed", type=int, default=config.SEED,
@@ -133,6 +151,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Tune on validation and save the winner without touching the test split.")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
+    if args.gpu_platform_id < -1 or args.gpu_device_id < -1:
+        parser.error("GPU platform/device IDs must be -1 or non-negative")
     if args.early_stopping_rounds < 1:
         parser.error("--early-stopping-rounds must be positive")
     for name in ("max_stations", "max_phase1_candidates", "max_phase2_candidates",
@@ -150,8 +170,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def require_lightgbm() -> None:
-    """Verify that LightGBM is importable and can run a small CPU fit."""
+def require_lightgbm(device: str = "cpu", platform_id: int = -1, device_id: int = -1) -> None:
+    """Verify the requested backend before loading data; never silently fall back."""
     try:
         import lightgbm as lgb
     except ImportError as error:
@@ -160,22 +180,23 @@ def require_lightgbm() -> None:
     try:
         probe = lgb.LGBMRegressor(
             objective="regression",
-            device_type="cpu",
+            **_device_params(device, platform_id, device_id),
             n_estimators=1,
             min_child_samples=1,
             random_state=config.SEED,
             n_jobs=1,
-            verbosity=-1,
+            verbosity=1 if device == "gpu" else -1,
         )
-        probe.fit(np.array([[0.0], [1.0], [2.0], [3.0]]), np.array([0.0, 1.0, 0.0, 1.0]))
+        X = np.random.default_rng(config.SEED).normal(size=(200, 4))
+        probe.fit(X, X[:, 0])
     except Exception as error:  # noqa: BLE001 - preserve the underlying error
         raise RuntimeError(
-            "Stage 2 requires a working CPU LightGBM installation. The installed build could not "
-            "fit the preflight model."
+            f"LightGBM device={device} preflight failed: {error}. "
+            "For gpu, install a GPU-enabled OpenCL build; use --device cpu explicitly to run on CPU."
         ) from error
 
 
-def probe_multi_head() -> None:
+def probe_multi_head(device: str = "cpu", platform_id: int = -1, device_id: int = -1) -> None:
     """Check that ONE LightGBM model fits t+1...t+7 jointly and predicts (n, 7)."""
     rng = np.random.default_rng(config.SEED)
     n = 60
@@ -183,7 +204,7 @@ def probe_multi_head() -> None:
     for h in config.FORECAST_HORIZONS:
         frame[f"target_t{h}"] = frame["a"] * h + rng.normal(scale=0.1, size=n)
     targets = [f"target_t{h}" for h in config.FORECAST_HORIZONS]
-    estimator, _ = _fit_lgbm({"min_child_samples": 1}, _stack_horizons(frame, ["a", "b", "c"]),
+    estimator, _ = _fit_lgbm({"min_child_samples": 1, **_device_params(device, platform_id, device_id)}, _stack_horizons(frame, ["a", "b", "c"]),
                              _stack_targets(frame, targets), None, None, 5, None)
     shape = np.asarray(estimator.predict(_stack_horizons(frame, ["a", "b", "c"]))).reshape(
         len(config.FORECAST_HORIZONS), n).T.shape
@@ -192,34 +213,37 @@ def probe_multi_head() -> None:
 
 
 def make_cpu_lgbm(params: dict[str, Any], prefer_gpu: bool = True):
-    """Build a LightGBM regressor that always uses CPU.
+    """Build the explicitly selected backend (CPU by default).
 
     ``prefer_gpu`` is accepted because Stage 1's shared fitting helper passes
-    it to factories; it is ignored because Stage 2 is explicitly CPU-only.
+    it to factories. Device is carried in params so every nested fit uses it.
+    The historical function name is retained for callers and test factories.
     """
     import lightgbm as lgb
 
     return lgb.LGBMRegressor(
         objective="regression",
-        device_type="cpu",
         random_state=SEED,
         n_jobs=-1,
         subsample_freq=1,  # enables row sampling when subsample < 1
         verbosity=-1,
-        **params,
+        **{"device_type": "cpu", **params},
     )
 
 
-def make_spec(experiment: int, seed: int = config.SEED) -> models.RunSpec:
+def make_spec(experiment: int, seed: int = config.SEED, device: str = "cpu",
+              gpu_platform_id: int = -1, gpu_device_id: int = -1) -> Stage2RunSpec:
     setting = EXPERIMENTS[experiment]
     scope = setting["scope"]
-    return models.RunSpec(
-        run_id=f"S2_{experiment}__{setting['label']}__LGBM_CPU__SEED{seed}",
+    return Stage2RunSpec(
+        run_id=f"S2_{experiment}__{setting['label']}__LGBM_{device.upper()}__SEED{seed}",
         algorithm="lightgbm",
         training_strategy=scope,
         forecast_strategy=setting["forecast"],
         spatial_mode="none",
-        prefer_gpu=False,
+        prefer_gpu=(device == "gpu"),
+        gpu_platform_id=gpu_platform_id,
+        gpu_device_id=gpu_device_id,
         include_station_id=True,
         include_region_id=(scope == "regional"),
         # Multi-output fitting needs one complete seven-target row per sample.
@@ -451,7 +475,7 @@ def _multi_output_partition(
 def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
                         masks: dict[str, pd.Series], feature_columns: list[str],
                         params: dict[str, Any]) -> dict[str, Any]:
-    """E1.3's global + station OOF residual method with vector-output wrappers."""
+    """E1.3's OOF residual method with one horizon-stacked model at each level."""
     frame, feature_columns = models._add_categorical_codes(
         frame, spec, feature_columns, masks["train"]
     )
@@ -531,7 +555,9 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
     if evaluation == "validation":
         # Keep the locked test rows out of every tuning run.
         frame = frame[frame[config.DATE_COL] < pd.Timestamp(config.TEST_START)].copy()
-    params = {**params, "n_estimators": int(budget)}
+    params = {**params, "n_estimators": int(budget),
+              **_device_params("gpu" if spec.prefer_gpu else "cpu",
+                               getattr(spec, "gpu_platform_id", -1), getattr(spec, "gpu_device_id", -1))}
     masks = _evaluation_masks(frame, evaluation)
     eval_spec = replace(
         spec,
@@ -624,7 +650,7 @@ def save_split(run_dir: Path, spec: models.RunSpec, df: pd.DataFrame, stations: 
         training_log=run_config["description"],
         split=split,
         model_records=result["model_records"],
-        prefer_gpu=False,
+        prefer_gpu=spec.prefer_gpu,
     )
 
 
@@ -822,12 +848,12 @@ def main(argv: list[str] | None = None) -> int:
     SEED = args.seed
     random.seed(args.seed)
     np.random.seed(args.seed)
-    require_lightgbm()
-    probe_multi_head()
+    require_lightgbm(args.device, args.gpu_platform_id, args.gpu_device_id)
+    probe_multi_head(args.device, args.gpu_platform_id, args.gpu_device_id)
 
-    spec = make_spec(args.experiment, args.seed)
+    spec = make_spec(args.experiment, args.seed, args.device, args.gpu_platform_id, args.gpu_device_id)
     if not args.train:
-        print("[dry run] CPU LightGBM and single-model multi-head probes passed. "
+        print(f"[dry run] {args.device.upper()} LightGBM and single-model multi-head probes passed. "
               "Re-run with --train to load data and tune.")
         return 0
 
@@ -863,7 +889,7 @@ def main(argv: list[str] | None = None) -> int:
     output_mode = "multi-output (one model)" if spec.forecast_strategy == "multi" else "single-output/direct"
     description = (
         f"Stage 2 experiment {args.experiment}: {EXPERIMENTS[args.experiment]['scope']} LightGBM "
-        f"with {output_mode} forecasting; CPU training. Parameters were selected by validation "
+        f"with {output_mode} forecasting; {args.device.upper()} training. Parameters were selected by validation "
         "primary macro RMSE using a coarse-to-fine hierarchical grid search."
     )
     run_config = {
@@ -889,8 +915,10 @@ def main(argv: list[str] | None = None) -> int:
         "spatial_mode": "none",
         "include_station_id": True,
         "include_region_id": spec.include_region_id,
-        "requested_device": "cpu",
-        "actual_device_requirement": "cpu",
+        "requested_device": args.device,
+        "actual_device_requirement": args.device,
+        "gpu_platform_id": args.gpu_platform_id,
+        "gpu_device_id": args.gpu_device_id,
         "selection_split": "validation",
         "test_locked_during_tuning": True,
         "tuning_mode": "hierarchical-grid",

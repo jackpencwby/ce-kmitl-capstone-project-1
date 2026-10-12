@@ -1,4 +1,66 @@
-# Stage 2 (LightGBM, CPU) — คำอธิบายโค้ดและการแก้ไขของ Jack
+# Stage 2 (LightGBM) — คำอธิบายโค้ดและการแก้ไขของ Jack
+
+## GPU support for experiments 15/16 (2026-10-12)
+
+15/16 already import `jack_run_stage2`. They therefore use the hierarchical
+grid below, and 16 uses one horizon-stacked LightGBM model for global and
+one per eligible station. Both levels remain LightGBM OOF residual correction.
+
+The runner now accepts `--device gpu` (OpenCL on Windows) and `--device cpu`.
+The selected backend is passed to every global, OOF and local fit, including
+test refits. Run IDs contain `LGBM_GPU` or `LGBM_CPU`; artifacts record the
+requested and actual device. Both scalar and stacked probes run before data
+loading. A GPU failure stops with a diagnostic instead of falling back.
+
+CPU remains the default. On this machine with the locally built wheel, OpenCL
+platform **1**, device **0** is the NVIDIA RTX 4060 Laptop GPU; automatic
+selection chooses the AMD integrated GPU instead. Platform ordering is specific
+to the LightGBM OpenCL loader: verify the GPU name printed by preflight rather
+than copying indices from another OpenCL utility or another machine.
+
+```powershell
+# Preflight first
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0
+
+# Full runs, one at a time
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train
+```
+
+GPU requires a GPU-enabled LightGBM build. The original local 4.7.0 binary
+reported `GPU Tree Learner was not enabled in this build`. Windows uses
+`device_type="gpu"` (OpenCL), not the Linux CUDA backend. See the
+[official installation guide](https://lightgbm.readthedocs.io/en/stable/Installation-Guide.html#build-gpu-version).
+GPU changes computation, not the model architecture, grids, target alignment,
+OOF boundaries or the fixed-budget policy of 15/16. Floating-point results
+can differ from CPU; no speedup or bit-for-bit equality is assumed. Old 16
+artifacts from `MultiOutputRegressor` belong to a different architecture.
+
+The sections below describe Jack's original CPU implementation. The historical
+factory name `make_cpu_lgbm` is retained, but it now honors `device_type` passed
+by the runner. Direct Python calls and experiments 1–4 retain CPU defaults.
+
+### Local GPU installation
+
+The project `.venv` now has LightGBM **4.7.0** rebuilt with integrated OpenCL.
+The source came from the PyPI 4.7.0 sdist. Build settings were
+`__INTEGRATE_OPENCL=ON`, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, Visual Studio 2022
+MSVC 14.38 (x64). Boost 1.74's build setup required explicit `msvc` bootstrap,
+`toolset=msvc-14.3`, `address-model=64`, `architecture=x86`, the existing
+`vcvars64.bat` with setup rewriting disabled, and `BOOST_ALL_NO_LIB` to use
+CMake's explicit Boost libraries. These are build-system adjustments only.
+
+A reinstallable local wheel is retained in the ignored artifacts directory:
+`artifacts/builds/lightgbm-4.7.0-py3-none-win_amd64.whl`.
+SHA256: `7fb77a97e32216f1d2cf88a5ecc92ed0549e1f05d2de93d3560f2056d8ff164e`.
+
+```powershell
+.venv\Scripts\python.exe -m pip install --no-deps --force-reinstall experiment-stage-2\artifacts\builds\lightgbm-4.7.0-py3-none-win_amd64.whl
+```
+
+Reinstalling the stock PyPI wheel can remove GPU support. No other Python
+dependencies were replaced for this GPU installation.
 
 เอกสารนี้อธิบายไฟล์ `jack_*` ใน `experiment-stage-2/` ว่าแต่ละไฟล์ทำอะไร, ทำงานอย่างไร และอะไรถูกเปลี่ยนจากเวอร์ชันเดิม (random search + `MultiOutputRegressor`)
 

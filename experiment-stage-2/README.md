@@ -1,10 +1,10 @@
-# Experiment Stage 2 - CPU LightGBM tuning
+# Experiment Stage 2 - LightGBM tuning
 
 XGBoost global + local tree experiments **13/14** use
 [`run_xgb_residual.py`](run_xgb_residual.py), with XGBoost at both levels.
 See [the XGBoost residual guide](XGB_RESIDUAL_README.md) for architecture,
 Tawan-based tuning, CUDA requirements, and commands. The runner documented
-below remains the CPU LightGBM runner for 1/2/3/4/15/16.
+below uses Jack's LightGBM runner for 1/2/3/4/15/16, with CPU/OpenCL GPU selection.
 
 Stage 2 implements these experiment rows:
 
@@ -24,7 +24,8 @@ deterministic **coarse-to-fine hierarchical grid search** (no random sampling): 
 full Cartesian product has 16,200,000 candidates, so it is walked in three phases
 (structure -> regularization -> local refinement) with successive-halving pruning.
 `n_estimators` is taken from the grid as a boosting budget (300/800/2000) and
-validation early stopping chooses the actual tree count. See
+validation early stopping chooses the actual tree count for 1–4. Experiments
+15/16 use fixed candidate budgets for their nested OOF fits. See
 `jack_stage2_explained.md` for the full description.
 
 For experiments 2/4/16 ("multiple prediction head") there is **one LightGBM model**
@@ -49,11 +50,14 @@ OOF, and local models using train+validation only. OOF fold boundaries are
 saved with the artifacts. These runs cost more than global-only experiments
 because every trial also trains OOF and per-station models.
 
-## CPU contract
+## Device selection
 
-Stage 2 runs with `device_type="cpu"`, so it works with the standard Windows
-LightGBM package. Before loading data, `jack_run_stage2.py` performs a tiny CPU
-LightGBM fit and stops only if LightGBM itself is not usable:
+Use `--device gpu` for GPU acceleration through OpenCL on Windows, or
+`--device cpu` for CPU. The chosen device applies to global, OOF, and local
+residual models. It is included in run IDs and artifacts. Before loading data,
+`jack_run_stage2.py` probes scalar and horizon-stacked fits on that device;
+failure stops the run instead of silently falling back. GPU requires a
+GPU-enabled LightGBM build; see `jack_stage2_explained.md` for details.
 
 ```powershell
 .venv\Scripts\python.exe experiment-stage-2\jack_run_stage2.py --experiment 1
@@ -76,8 +80,8 @@ available logical CPU cores by default:
 .venv\Scripts\python.exe experiment-stage-2\jack_E2_2_global_multi_head.py --train --source gcs
 .venv\Scripts\python.exe experiment-stage-2\jack_E2_3_regional_single_head.py --train --source gcs
 .venv\Scripts\python.exe experiment-stage-2\jack_E2_4_regional_multi_head.py --train --source gcs
-.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --train --source gcs
-.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --train --source gcs
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train --source gcs
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train --source gcs
 ```
 
 Tuning uses validation `primary_macro_rmse` only. The selected parameter set
