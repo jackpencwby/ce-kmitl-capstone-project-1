@@ -67,6 +67,8 @@ EXPERIMENTS: dict[int, dict[str, str]] = {
     2: {"scope": "global", "forecast": "multi", "label": "GLOBAL_MULTI_HEAD"},
     7: {"scope": "regional", "forecast": "direct", "label": "REGIONAL_SINGLE_HEAD"},
     8: {"scope": "regional", "forecast": "multi", "label": "REGIONAL_MULTI_HEAD"},
+    13: {"scope": "global_local_tree", "forecast": "direct", "label": "GLOBAL_LOCAL_TREE_SINGLE_HEAD"},
+    14: {"scope": "global_local_tree", "forecast": "multi", "label": "GLOBAL_LOCAL_TREE_MULTI_HEAD"},
 }
 
 
@@ -76,6 +78,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--train", action="store_true", help="Run hierarchical tuning and save artifacts.")
     parser.add_argument("--source", choices=("auto", "local", "gcs"), default="auto")
     parser.add_argument("--seed", type=int, default=config.SEED)
+    parser.add_argument("--device", choices=("cpu", "cuda:0"), default=None,
+                        help="Experiments 13/14 only: explicit device override (defaults: 13 CUDA, 14 CPU).")
     parser.add_argument("--stations", nargs="+", default=["all"])
     parser.add_argument("--max-stations", type=int)
     parser.add_argument("--skip-test", action="store_true", help="Stop after validation selection/refit.")
@@ -88,6 +92,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--development", action="store_true", help="Use a small deterministic candidate subset.")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
+    if args.device is not None and args.experiment not in (13, 14):
+        parser.error("--device is supported only for residual experiments 13/14")
     if args.early_stopping_rounds < 1:
         parser.error("--early-stopping-rounds must be positive")
     for name in ("max_stations", "max_phase1_candidates", "max_phase2_candidates", "max_phase3_candidates"):
@@ -493,7 +499,8 @@ def _run_round(phase: int, round_id: int, candidates: list[dict[str, Any]], budg
             "elapsed_seconds": None, "status": "running", "failure_reason": "",
         }
         try:
-            result = fit_evaluate(
+            evaluator = context.get("candidate_evaluator", fit_evaluate)
+            result = evaluator(
                 context, params, budget, args.early_stopping_rounds, args.seed,
                 fit_counter, keep_models=False,
             )
@@ -720,6 +727,9 @@ def _device_count_for_context(context: dict[str, Any]) -> int:
 def main(argv: list[str] | None = None) -> int:
     run_started = perf_counter()
     args = parse_args(argv)
+    if args.experiment in (13, 14):
+        from run_xgb_residual import main as residual_main
+        return residual_main(argv)
     logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO),
                         format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     np.random.seed(args.seed)

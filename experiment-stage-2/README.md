@@ -1,5 +1,11 @@
 # Experiment Stage 2 - CPU LightGBM tuning
 
+XGBoost global + local tree experiments **13/14** use
+[`run_xgb_residual.py`](run_xgb_residual.py), with XGBoost at both levels.
+See [the XGBoost residual guide](XGB_RESIDUAL_README.md) for architecture,
+Tawan-based tuning, CUDA requirements, and commands. The runner documented
+below remains the CPU LightGBM runner for 1/2/3/4/15/16.
+
 Stage 2 implements these experiment rows:
 
 | ID | Scope | Forecast strategy |
