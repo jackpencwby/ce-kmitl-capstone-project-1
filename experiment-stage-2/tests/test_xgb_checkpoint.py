@@ -14,6 +14,11 @@ import run_xgb_residual as residual
 
 
 class CheckpointTests(unittest.TestCase):
+    def summary(self):
+        return {'score': 1.5, 'best_iterations': {'global:1': 2}, 'best_scores': {},
+                'selected_rounds': {'global:1': 3},
+                'rmse_by_horizon': {f'rmse_t{h}': 1.5 for h in range(1, 8)}}
+
     def test_cli_resume_reuses_run_directory_and_finishes_both_splits(self):
         self.checkpoint_class()
         frame = pd.DataFrame({'station_id': 1, 'date': pd.date_range('2024-01-01', periods=450),
@@ -135,7 +140,7 @@ class CheckpointTests(unittest.TestCase):
             root = Path(directory)
             with cls(root, {}) as checkpoint:
                 scope = checkpoint.scope({'params': {'max_depth': 2}})
-                scope.save_summary({'score': 1.5, 'best_iterations': {'global:1': 2}})
+                scope.save_summary(self.summary())
             with cls(root, {}, resume=True) as checkpoint:
                 self.assertEqual(checkpoint.scope({'params': {'max_depth': 2}}).load_summary()['score'], 1.5)
                 self.assertIsNone(checkpoint.scope({'params': {'max_depth': 3}}).load_summary())
@@ -180,12 +185,13 @@ class CheckpointTests(unittest.TestCase):
             root = Path(directory)
             with cls(root, {}) as checkpoint:
                 scope = checkpoint.scope({'candidate': 1})
-                scope.save_summary({'score': 1.5})
-                (scope.root / 'summary.json').write_text('{broken')
+                scope.save_summary(self.summary())
                 context = {'candidate_evaluator': lambda *a, **kw: scope.load_summary()}
                 args = residual.base.parse_args(['--experiment', '13'])
-                with self.assertRaises(Exception):
-                    residual.base._run_round(1, 1, [{}], 2, context, args, root, [], {'total': 0}, {})
+                for broken in ('{broken', '{}', 'null', '{"score": "bad"}'):
+                    (scope.root / 'summary.json').write_text(broken)
+                    with self.assertRaises(residual.base.CheckpointError):
+                        residual.base._run_round(1, 1, [{}], 2, context, args, root, [], {'total': 0}, {})
 
 
 if __name__ == '__main__':

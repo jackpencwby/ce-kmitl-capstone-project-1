@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import shutil
 import sys
@@ -134,11 +135,22 @@ class FitScope:
             return None
         LOGGER.info('Resume: completed candidate %s', self.root.name[:12])
         with checkpoint_io():
-            return json.loads(path.read_text(encoding='utf-8'))
+            saved = json.loads(path.read_text(encoding='utf-8'))
+            result = saved['result']
+            if digest(result) != saved['sha256']:
+                raise ValueError('Candidate summary checksum mismatch')
+            if not isinstance(result, dict) or not isinstance(result['score'], (int, float)):
+                raise ValueError('Invalid candidate score')
+            if not math.isfinite(result['score']):
+                raise ValueError('Non-finite candidate score')
+            for name in ('best_iterations', 'best_scores', 'selected_rounds', 'rmse_by_horizon'):
+                if not isinstance(result[name], dict):
+                    raise ValueError(f'Invalid candidate summary field: {name}')
+            return result
 
     def save_summary(self, result):
         with checkpoint_io():
-            atomic_json(self.root / 'summary.json', result)
+            atomic_json(self.root / 'summary.json', {'result': result, 'sha256': digest(result)})
         # Once the score is committed, these candidate-only models are redundant.
         models = self.root / 'models'
         if models.exists():
