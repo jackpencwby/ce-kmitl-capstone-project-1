@@ -26,6 +26,44 @@ class MeanModel:
 
 
 class XGBResidualTests(unittest.TestCase):
+    def test_real_scalar_and_vector_early_stopping(self):
+        rows = self.frame[self.frame.station_id == 1].iloc[:200]
+        for multi in [False, True]:
+            y = np.r_[np.zeros(170), np.ones(30)]
+            if multi:
+                y = np.repeat(y[:, None], 7, axis=1)
+            with patch.object(residual.base, '_xgb', REAL_XGB):
+                model, rounds = residual._fit(
+                    rows, y, ['x'], {'device': 'cpu', 'n_jobs': 1, 'max_depth': 2},
+                    42, 50, 3, multi, {'total': 0})
+            self.assertLess(rounds, 50)
+            self.assertEqual(model.get_params()['n_estimators'], rounds)
+            self.assertGreater(np.asarray(model.predict(rows[['x']].tail(30))).mean(), 0)
+
+    def test_test_refit_reuses_each_oof_selected_round_count(self):
+        for experiment in [13, 14]:
+            spec = residual.base.make_spec(experiment, 42)
+            context = residual.make_context(self.frame, [1, 2], spec, 'validation')
+            original_fit = residual._fit
+            def choose_rounds(rows, targets, xcols, params, seed, budget, patience, multi, counter):
+                chosen = 2 if rows.x.max() < 300 else 4
+                return original_fit(rows, targets, xcols, params, seed, chosen, None, multi, counter)
+            with patch.object(residual, '_fit', choose_rounds):
+                result = residual.fit_evaluate(context, {}, 10, 3, 42, {'total': 0})
+            selected = result['selected_rounds']
+            oof = {k: v for k, v in selected.items() if k.startswith('oof:')}
+            self.assertEqual(len(oof), 28 if experiment == 13 else 4)
+            calls = []
+            def capture(*args):
+                calls.append((args[5], args[6]))
+                return original_fit(*args)
+            test_context = residual.make_context(self.frame, [1, 2], spec, 'test')
+            with patch.object(residual, '_fit', capture):
+                test = residual.fit_evaluate(test_context, {}, 10, 3, 42, {'total': 0},
+                                             selected_rounds=selected)
+            self.assertEqual(test['selected_rounds'], selected)
+            self.assertTrue(all(patience is None for _, patience in calls))
+
     def setUp(self):
         self.frame = pd.concat([
             pd.DataFrame({'station_id': sid, 'date': pd.date_range('2024-01-01', periods=450),

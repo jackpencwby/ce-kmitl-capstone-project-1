@@ -37,6 +37,13 @@ supplied training rows. Smaller samples use the candidate budget. This keeps
 OOF and outer holdout labels out of early stopping. Validation still selects
 hyperparameters by primary macro RMSE.
 
+Early stopping is enabled by default with patience 100 (`--early-stopping-rounds 100`)
+for global, all four OOF folds, and local models in experiments 13 and 14.
+Each OOF fold now saves its own selected tree count under `oof:<fold>:<horizon>`;
+test fitting reuses that count instead of the global model's count. Older
+round-count dictionaries without OOF entries fall back to global counts with
+a warning. Changes apply to newly started runs; running processes are unchanged.
+
 Final test fitting rebuilds global, OOF and local models on Train+Validation
 with the selected round counts and no test-based early stopping. A station
 that newly qualifies for local correction uses its global head's selected

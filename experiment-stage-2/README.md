@@ -25,7 +25,11 @@ full Cartesian product has 16,200,000 candidates, so it is walked in three phase
 (structure -> regularization -> local refinement) with successive-halving pruning.
 `n_estimators` is taken from the grid as a boosting budget (300/800/2000) and
 validation early stopping chooses the actual tree count for 1–4. Experiments
-15/16 use fixed candidate budgets for their nested OOF fits. See
+15/16 select tree counts on the last 15% of each fit's training rows, purging
+seven days from the fit/stop boundary. They refit on all training rows and reuse
+validation-selected counts for test (including OOF fits). Patience defaults to
+100 via `--early-stopping-rounds`; small splits (<50 fit or <10 stopping rows)
+use the full budget. Existing running processes must be restarted to use this change. See
 `jack_stage2_explained.md` for the full description.
 
 For experiments 2/4/16 ("multiple prediction head") there is **one LightGBM model**

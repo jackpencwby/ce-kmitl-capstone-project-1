@@ -77,8 +77,16 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
             fold_train, fold_score = train.loc[fit_mask], train.loc[valid_mask]
             if fold_train.empty or fold_score.empty:
                 continue
-            fold_model, _ = _fit(fold_train, fold_train[targets].to_numpy(), xcols,
-                                 params, seed, global_budget, patience, multi, fit_counter)
+            fold_key = f'oof:{fold.index}:{horizon}'
+            fold_budget = budget
+            if selected_rounds is not None:
+                fold_budget = selected_rounds.get(fold_key, global_budget)
+                if fold_key not in selected_rounds:
+                    base.LOGGER.warning('%s has no saved rounds; using selected global rounds %d',
+                                        fold_key, global_budget)
+            fold_model, fold_rounds = _fit(fold_train, fold_train[targets].to_numpy(), xcols,
+                                           params, seed, fold_budget, patience, multi, fit_counter)
+            round_counts[fold_key] = fold_rounds
             oof_rows.append(fold_score)
             oof_targets.append(fold_score[targets].to_numpy() - fold_model.predict(fold_score[xcols]))
             del fold_model
@@ -172,6 +180,8 @@ def main(argv=None):
     run_id = ('DEV_' if args.development else '') + spec.run_id
     run_dir = base._artifact_dir(run_id)
     base.LOGGER.info('Output: %s; tuning global + station residual XGBoost', run_dir)
+    base.LOGGER.info('Early stopping: patience=%d, purged 85/15 training split for global/OOF/local; '
+                     'test reuses each validation-selected tree count', args.early_stopping_rounds)
     best_params, summary, _, _, fit_counter = base.hierarchical_search(context, args, run_dir)
     validation = fit_evaluate(context, best_params, base.MAX_BOOSTING_ROUNDS,
                               args.early_stopping_rounds, args.seed, {'total': 0}, True)
@@ -189,6 +199,7 @@ def main(argv=None):
         'development_run': args.development, 'selection_split': 'validation',
         'test_locked_during_tuning': True, 'early_stopping_policy': 'purged_training_tail_85_15_then_refit',
         'early_stopping_rounds': args.early_stopping_rounds,
+        'oof_rounds_policy': 'per_fold_validation_selected',
         'local_min_rows': base.config.MLP_PARAMS.min_station_rows,
         'local_fallback': 'global_prediction', 'new_local_rounds_fallback': 'selected_global_rounds',
         'residual_source': 'expanding_training_only_out_of_fold',

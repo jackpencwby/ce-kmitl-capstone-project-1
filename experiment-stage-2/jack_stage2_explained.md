@@ -13,19 +13,19 @@ requested and actual device. Both scalar and stacked probes run before data
 loading. A GPU failure stops with a diagnostic instead of falling back.
 
 CPU remains the default. On this machine with the locally built wheel, OpenCL
-platform **1**, device **0** is the NVIDIA RTX 4060 Laptop GPU; automatic
-selection chooses the AMD integrated GPU instead. Platform ordering is specific
+platform **0**, device **0** selected the NVIDIA RTX 4060 Laptop GPU in the
+2026-10-13 probe (platform 1 selected AMD). Platform ordering is specific
 to the LightGBM OpenCL loader: verify the GPU name printed by preflight rather
 than copying indices from another OpenCL utility or another machine.
 
 ```powershell
 # Preflight first
-.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0
-.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 0 --gpu-device-id 0
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 0 --gpu-device-id 0
 
 # Full runs, one at a time
-.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train
-.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 1 --gpu-device-id 0 --train
+.venv\Scripts\python.exe experiment-stage-2\E2_15_global_local_tree_single_head.py --device gpu --gpu-platform-id 0 --gpu-device-id 0 --train
+.venv\Scripts\python.exe experiment-stage-2\E2_16_global_local_tree_multi_head.py --device gpu --gpu-platform-id 0 --gpu-device-id 0 --train
 ```
 
 GPU requires a GPU-enabled LightGBM build. The original local 4.7.0 binary
@@ -143,7 +143,7 @@ reshape (7, n).T  →  prediction shape (n, 7)
 | 2 Regularization | `min_split_gain`(5) × `reg_alpha`(6) × `reg_lambda`(6) ครบทุกค่าในโดเมน; โครงสร้างตรึงที่ผู้ชนะ Phase 1 | 5·6·6 | **180** | 800 → เก็บ 36 → 2000 |
 | 3 Fine local | ค่าข้างเคียง 3 ค่าในโดเมนเดิมของ 6 พารามิเตอร์โครงสร้างรอบผู้ชนะ Phase 2 (ขอบโดเมนจะเลื่อนหน้าต่าง) | 3⁶ | **729** | 300 → เก็บ 72 → 800 → เก็บ 12 → 2000 |
 
-- **`n_estimators`**: ไม่ใช่แกน grid อิสระ — ค่า 300/800/2000 (ซึ่งอยู่ในโดเมน) ใช้เป็น *งบจำนวนต้นไม้* ของแต่ละรอบ และ **early stopping (100 รอบ, ดู validation) เป็นตัวเลือกจำนวนต้นไม้จริง** (บันทึกเป็น `best_iteration`) ใช้กับ exp 1–4; exp 15/16 ไม่ใช้ early stopping (มี OOF ซ้อน) ใช้ `n_estimators = budget` ตรงๆ
+- **`n_estimators`**: 300/800/2000 are maximum budgets. Experiments 1?4 select rounds using validation. Experiments 15/16 use early stopping (default patience 100) on the last 15% of each global/OOF/local training set, with a seven-day label purge, then refit all training rows. Test reuses validation-selected counts for every model, including OOF folds. Fewer than 50 fit or 10 stopping rows falls back to the budget. Outer validation/test and OOF scoring labels are never used for residual early stopping.
 - ผู้ชนะสุดท้าย = candidate ที่ได้ `primary_macro_rmse` ต่ำสุดในบรรดาผลที่รันที่ budget เต็ม (2000) ของทุก phase (ผลเสมอแก้ด้วยการเรียงสตริงพารามิเตอร์ → deterministic)
 - Regional (exp 3/4): ใช้ชุดพารามิเตอร์ **ร่วมกันทุก region** ที่เลือกจาก macro RMSE รวม (ไม่จูนแยก region) เพื่อให้เทียบกับ Global ได้เป็นธรรม
 - Single vs Multi เลือกพารามิเตอร์ของตัวเองด้วยโปรโตคอลเดียวกัน (ไม่บังคับให้เหมือนกัน)

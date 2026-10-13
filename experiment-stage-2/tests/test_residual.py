@@ -28,6 +28,57 @@ class MeanRegressor(RegressorMixin, BaseEstimator):
 
 
 class ResidualTests(unittest.TestCase):
+    def test_real_early_stopping_and_full_training_refit(self):
+        from lightgbm import LGBMRegressor
+
+        X = pd.DataFrame({'x': np.arange(200, dtype=float)})
+        y = np.r_[np.zeros(170), np.ones(30)]
+        dates = pd.date_range('2024-01-01', periods=200)
+        counts = {}
+        def factory(params):
+            return LGBMRegressor(**params, n_jobs=1, verbosity=-1)
+        with patch.object(stage2, 'make_cpu_lgbm', factory):
+            estimator, used = stage2._fit_residual_lgbm(
+                {'n_estimators': 50, 'num_leaves': 3}, X, y, dates,
+                'global:t+1', 3, None, counts)
+        self.assertLess(used, 50)
+        self.assertEqual(counts['global:t+1'], used)
+        self.assertGreater(estimator.predict(X.tail(30)).mean(), 0)
+
+    def test_residual_early_stopping_selects_and_reuses_rounds(self):
+        calls = []
+
+        def fit(params, X, y, X_eval, y_eval, budget, patience):
+            calls.append((X.copy(), None if X_eval is None else X_eval.copy(), budget, patience))
+            return MeanRegressor().fit(X, y), 2 if patience else budget
+
+        with patch.object(stage2, '_fit_lgbm', fit):
+            for experiment in [15, 16]:
+                calls.clear()
+                spec = stage2.make_spec(experiment)
+                result = stage2.run_pooled(spec, self.frame, [1, 2], {}, 'validation',
+                                           budget=20, early_stopping_rounds=3)
+                probes = [(X, ev) for X, ev, _, patience in calls if patience]
+                self.assertTrue(probes)
+                for X, ev in probes:
+                    self.assertLess(X.x.max() + 7, ev.x.min())
+                self.assertTrue(result['fit_rounds'])
+                self.assertTrue(all(n == 2 for n in result['fit_rounds'].values()))
+                changed = self.frame.copy()
+                for h in range(1, 8):
+                    changed.loc[changed.date + pd.Timedelta(days=h) >= '2025-01-01',
+                                f'target_t{h}'] += 1e6
+                other = stage2.run_pooled(spec, changed, [1, 2], {}, 'validation',
+                                          budget=20, early_stopping_rounds=3)
+                np.testing.assert_allclose(result['predictions'].y_pred,
+                                           other['predictions'].y_pred)
+                calls.clear()
+                stage2.run_pooled(spec, self.frame, [1, 2], {}, 'test', budget=20,
+                                  fit_rounds=result['fit_rounds'])
+                self.assertTrue(calls)
+                self.assertTrue(all(budget == 2 and patience is None
+                                    for _, _, budget, patience in calls))
+
     def test_gpu_device_reaches_every_global_oof_and_local_fit(self):
         calls = []
 

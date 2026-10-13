@@ -138,7 +138,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", "--random-seed", dest="seed", type=int, default=config.SEED,
                         help="Seed for LightGBM sampling and candidate tie-breaking.")
     parser.add_argument("--early-stopping-rounds", type=int, default=100,
-                        help="Validation early stopping used during tuning (not used for E2_15/16).")
+                        help="Early stopping patience; E2_15/16 use a purged internal training tail.")
     parser.add_argument("--phase1-pruning", action=argparse.BooleanOptionalAction, default=True,
                         help="Successive halving in Phase 1 (default on).")
     parser.add_argument("--max-phase1-candidates", type=int, default=None)
@@ -299,6 +299,29 @@ def _rounds_for(fit_rounds: dict[str, int] | None, key: str, budget: int) -> int
     return int(fit_rounds[key])
 
 
+def _fit_residual_lgbm(params, X, y, dates, key, patience, selected, used_rounds):
+    """Select on a purged training tail, then refit all training rows.
+
+    Never consume outer scoring labels, including OOF scoring labels. At test
+    time reuse validation-selected counts, including counts for each OOF fold.
+    """
+    budget = _rounds_for(selected, key, params["n_estimators"])
+    used = budget
+    if selected is None and patience:
+        dates = pd.Series(np.asarray(dates))
+        cutoff = dates.quantile(.85)
+        train = (dates + pd.Timedelta(days=max(config.FORECAST_HORIZONS)) < cutoff).to_numpy()
+        stop = (dates >= cutoff).to_numpy()
+        if train.sum() >= 50 and stop.sum() >= 10:
+            _, used = _fit_lgbm(params, X.iloc[train], np.asarray(y)[train],
+                                X.iloc[stop], np.asarray(y)[stop], budget, patience)
+        else:
+            LOGGER.debug("%s: insufficient training-tail rows; using budget %d", key, budget)
+    estimator, _ = _fit_lgbm(params, X, y, None, None, used, None)
+    used_rounds[key] = int(used)
+    return estimator, int(used)
+
+
 def _stack_horizons(rows: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
     """Repeat ``rows`` once per horizon, adding the ``forecast_horizon`` feature.
 
@@ -401,6 +424,7 @@ def _multi_output_partition(
     group_name: str,
     early_stopping_rounds: int | None = None,
     fit_rounds: dict[str, int] | None = None,
+    residual_fit=None,
 ) -> tuple[pd.DataFrame, list[pd.DataFrame], list[dict[str, Any]]]:
     """Multi-output forecasting with ONE LightGBM model for t+1...t+7.
 
@@ -431,12 +455,18 @@ def _multi_output_partition(
     stacked_columns = feature_columns + [HORIZON_FEATURE]
     key = _round_key(group_name, None)
     validation_stack = _stack_horizons(validation_rows, feature_columns)
-    estimator, used = _fit_lgbm(
-        params, _stack_horizons(train_rows, feature_columns), _stack_targets(train_rows, target_columns),
-        validation_stack, _stack_targets(validation_rows, target_columns),
-        _rounds_for(fit_rounds, key, params["n_estimators"]),
-        None if fit_rounds is not None else early_stopping_rounds,
-    )
+    if residual_fit is not None:
+        estimator, used = residual_fit(
+            _stack_horizons(train_rows, feature_columns), _stack_targets(train_rows, target_columns),
+            np.tile(train_rows[config.DATE_COL].to_numpy(), len(config.FORECAST_HORIZONS)), key,
+        )
+    else:
+        estimator, used = _fit_lgbm(
+            params, _stack_horizons(train_rows, feature_columns), _stack_targets(train_rows, target_columns),
+            validation_stack, _stack_targets(validation_rows, target_columns),
+            _rounds_for(fit_rounds, key, params["n_estimators"]),
+            None if fit_rounds is not None else early_stopping_rounds,
+        )
     flat = np.asarray(estimator.predict(validation_stack))
     n_horizons = len(config.FORECAST_HORIZONS)
     if flat.shape != (len(validation_rows) * n_horizons,):
@@ -474,7 +504,7 @@ def _multi_output_partition(
 
 def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
                         masks: dict[str, pd.Series], feature_columns: list[str],
-                        params: dict[str, Any]) -> dict[str, Any]:
+                        params: dict[str, Any], residual_fit=None) -> dict[str, Any]:
     """E1.3's OOF residual method with one horizon-stacked model at each level."""
     frame, feature_columns = models._add_categorical_codes(
         frame, spec, feature_columns, masks["train"]
@@ -482,7 +512,7 @@ def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
     train = frame.loc[masks["train"]]
     evaluation = frame.loc[masks["validation"]]
     predictions, importances, records = _multi_output_partition(
-        spec, params, train, evaluation, feature_columns, "global"
+        spec, params, train, evaluation, feature_columns, "global", residual_fit=residual_fit
     )
     if predictions.empty:
         return models._finalize(spec, predictions, importances, feature_columns, records)
@@ -499,7 +529,7 @@ def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
                             evaluation_end=cutoff.isoformat())
         oof, _, _ = _multi_output_partition(
             fold_spec, params, train.loc[train_mask], train.loc[valid_mask],
-            feature_columns, "global_oof"
+            feature_columns, f"global_oof_{fold.index}", residual_fit=residual_fit
         )
         if not oof.empty:
             oof_parts.append(oof)
@@ -520,7 +550,8 @@ def _run_multi_residual(spec: models.RunSpec, frame: pd.DataFrame,
                 continue
             station_eval = evaluation[evaluation[config.STATION_ID_COL] == station]
             correction, local_importances, local_records = _multi_output_partition(
-                spec, params, station_train, station_eval, feature_columns, str(station)
+                spec, params, station_train, station_eval, feature_columns, str(station),
+                residual_fit=residual_fit
             )
             for record in local_records:
                 record["role"] = "local_residual_multi_output"
@@ -548,8 +579,8 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
     ``budget`` is the maximum number of trees.  With ``early_stopping_rounds``
     the validation split picks the tree count (returned as ``fit_rounds``);
     ``fit_rounds`` from such a run fixes the tree counts for the test refit.
-    Early stopping is not applied to the residual experiments (15/16), whose
-    nested OOF fits use ``budget`` trees directly.
+    Residual experiments (15/16) select rounds on purged internal training
+    tails, refit all training rows, and reuse selected counts at test time.
     """
     frame = df[df[config.STATION_ID_COL].isin(stations)].copy()
     if evaluation == "validation":
@@ -568,11 +599,23 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
     base_columns = models.assemble_feature_columns(eval_spec)
     factory = partial(make_cpu_lgbm, dict(params))
     if eval_spec.training_strategy == "global_local_tree":
+        used_rounds = {}
+
+        def residual_fit(X, y, dates, key):
+            return _fit_residual_lgbm(params, X, y, dates, key, early_stopping_rounds,
+                                      fit_rounds, used_rounds)
+
+        def direct_fit(factory, prefer_gpu, X_tr, y_tr, X_val, y_val=None,
+                       train_dates=None, horizon=0, group="global"):
+            estimator, _ = residual_fit(X_tr, y_tr, train_dates, _round_key(group, horizon))
+            return estimator.predict(X_val), estimator
+
         if eval_spec.forecast_strategy == "multi":
-            result = _run_multi_residual(eval_spec, frame, masks, base_columns, params)
+            result = _run_multi_residual(eval_spec, frame, masks, base_columns, params, residual_fit)
         else:
-            result = models._run_residual(eval_spec, frame, factory, base_columns, masks)
-        result["fit_rounds"] = {}
+            result = models._run_residual(eval_spec, frame, factory, base_columns, masks,
+                                          fit_predict=direct_fit)
+        result["fit_rounds"] = used_rounds
         return result
 
     frame, feature_columns = models._add_categorical_codes(frame, eval_spec, base_columns, masks["train"])
@@ -926,8 +969,9 @@ def main(argv: list[str] | None = None) -> int:
         "phase_grids": {"phase1": PHASE1_GRID, "phase2": PHASE2_GRID,
                         "fixed_regularization_phase1": FIXED_REGULARIZATION},
         "boosting_budgets": {f"phase{p}": list(b) for p, b in args.budgets.items()},
-        "early_stopping_rounds": (None if spec.training_strategy == "global_local_tree"
-                                  else args.early_stopping_rounds),
+        "early_stopping_rounds": args.early_stopping_rounds,
+        "early_stopping_source": ("purged_training_tail_15_percent"
+                                  if spec.training_strategy == "global_local_tree" else "validation"),
         "pruning_enabled": args.phase1_pruning,
         "development_run": args.development,
         "seed": args.seed,

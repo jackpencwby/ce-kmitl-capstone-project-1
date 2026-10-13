@@ -551,7 +551,7 @@ def _run_pooled(spec, df, factory, feature_cols, masks) -> dict:
     return _finalize(spec, predictions, all_imp, cols, records)
 
 
-def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
+def _run_residual(spec, df, factory, feature_cols, masks, fit_predict=None) -> dict:
     """Global model + per-station local residual corrector (E1.3 / E1.5).
 
     Steps (plan E1.3):
@@ -585,9 +585,11 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
         # Global fit on full training window -> validation predictions.
         if len(train_rows) and len(val_rows) and (
                 not spec.baseline_xgb or val_rows[tcol].notna().any()):
-            yhat, est = _fit_predict_estimator(
+            fit = partial(fit_predict, group="global") if fit_predict else _fit_predict_estimator
+            yhat, est = fit(
                 _horizon_factory(factory, h), spec.prefer_gpu, train_rows[gcols], train_rows[tcol], val_rows[gcols],
                 val_rows[tcol] if spec.baseline_xgb else None,
+                **({"train_dates": train_rows[config.DATE_COL], "horizon": h} if fit_predict else {}),
             )
             vp = val_rows[[config.STATION_ID_COL, config.DATE_COL]].copy()
             vp["global_pred"] = yhat
@@ -608,7 +610,8 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
                       < fold.valid_start]
             if len(ftr) == 0 or len(fva) == 0:
                 continue
-            yhat, _ = _fit_predict_estimator(
+            fit = partial(fit_predict, group=f"global_oof_{fold.index}") if fit_predict else _fit_predict_estimator
+            yhat, _ = fit(
                 _horizon_factory(factory, h), spec.prefer_gpu, ftr[gcols], ftr[tcol], fva[gcols],
                 train_dates=ftr[config.DATE_COL], horizon=h,
             )
@@ -631,7 +634,7 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
         residual_pred = np.zeros(len(vp))
         if oof is not None and len(oof):
             residual_pred = corrector(spec, _horizon_factory(factory, h), oof, vp, gcols,
-                                      records, h)
+                                      records, h, **({"fit_predict": fit_predict} if fit_predict else {}))
         vp["y_pred"] = vp["global_pred"].to_numpy() + residual_pred
         vp["horizon"] = h
         final_preds.append(vp[[config.STATION_ID_COL, config.DATE_COL, "horizon", "y_true", "y_pred"]])
@@ -641,7 +644,7 @@ def _run_residual(spec, df, factory, feature_cols, masks) -> dict:
 
 
 def _tree_corrector(spec, factory, oof, val_pred, gcols,
-                    records=None, horizon=0) -> np.ndarray:
+                    records=None, horizon=0, fit_predict=None) -> np.ndarray:
     """Per-station tree residual model (E1.3). Falls back to 0 when sparse."""
     residual_pred = np.zeros(len(val_pred))
     oof = oof.copy()
@@ -654,7 +657,8 @@ def _tree_corrector(spec, factory, oof, val_pred, gcols,
         va = val_pred.loc[vidx]
         if len(otr) < config.MLP_PARAMS.min_station_rows:
             continue  # fallback residual = 0
-        predicted, est = _fit_predict_estimator(
+        fit = partial(fit_predict, group=str(sid)) if fit_predict else _fit_predict_estimator
+        predicted, est = fit(
             factory, spec.prefer_gpu, otr[gcols], otr["residual"], va[gcols],
             train_dates=otr[config.DATE_COL], horizon=horizon)
         if records is not None:

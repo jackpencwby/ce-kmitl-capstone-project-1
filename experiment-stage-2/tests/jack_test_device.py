@@ -56,11 +56,14 @@ class DeviceTests(unittest.TestCase):
                 spec = stage2.make_spec(experiment, device='gpu',
                                        gpu_platform_id=int(os.environ.get('LIGHTGBM_GPU_PLATFORM_ID', '-1')),
                                        gpu_device_id=0)
+                selected = None
                 for split in ('validation', 'test'):
                     with self.subTest(experiment=experiment, split=split):
                         result = stage2.run_pooled(spec, fixture.frame, [1, 2],
                                                   {'num_leaves': 3, 'min_child_samples': 5},
-                                                  split, budget=2)
+                                                  split, budget=5, early_stopping_rounds=2,
+                                                  fit_rounds=selected)
+                        selected = result['fit_rounds']
                         records = result['model_records']
                         self.assertEqual(len(records), 21 if experiment == 15 else 3)
                         self.assertTrue(np.isfinite(result['predictions'].y_pred).all())
