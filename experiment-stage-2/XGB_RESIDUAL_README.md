@@ -48,7 +48,48 @@ Final test fitting rebuilds global, OOF and local models on Train+Validation
 with the selected round counts and no test-based early stopping. A station
 that newly qualifies for local correction uses its global head's selected
 round count if no previous local round count exists. `--skip-test` saves the
-validation models only. This runner has no resume support.
+validation models only. Experiments 13/14 support opt-in checkpoint/resume as described below.
+
+### Checkpoint / resume (E13 and E14)
+
+Add `--checkpoint --train` to save completed global, OOF, and station fits.
+Resume with the **same training arguments** plus `--resume <artifact-directory>`.
+The directory is printed as `Output:` / `Created checkpoint:` in the log.
+An old run created without checkpoints cannot be resumed.
+
+```bash
+# On the KMITL server, submit from the repository root:
+mkdir -p experiment-stage-2/run_logs
+sbatch experiment-stage-2/Japan_E2_13_train.sh
+# After a timeout, interruption, or cancellation, use its original artifact directory:
+sbatch experiment-stage-2/Japan_E2_13_train.sh --resume experiment-stage-2/artifacts/<run-directory>
+```
+
+The script uses `.venv-japan/bin/python`, the same interpreter configured for
+Japan-kernel, and requests one 23 GB MIG device, 4 CPUs, 32 GB RAM, and 24 hours.
+Install `experiment-stage-2/requirements.txt` in that environment first.
+`sbatch` runs independently of any notebook kernel. It does not automatically
+resubmit; rerun the resume command when the previous job has stopped.
+
+Checkpoints commit native XGBoost models with checksums and atomic JSON markers.
+A restarted search replays its deterministic candidate ordering, loads completed
+scores, and skips already committed fits in the interrupted candidate. Once a
+tuning candidate finishes, its intermediate models are removed to limit disk use;
+final validation/test models remain available until export finishes. Validation
+and test refits use separate checkpoint scopes. Training resumes at **completed
+model boundaries**, not at an individual boosting iteration. The in-progress model
+(including its early-stopping probe) is repeated after an interruption.
+
+A manifest checks data contents, station selection, arguments, Python/package
+versions, and source hashes. Changed runs are rejected instead of mixing results.
+Only one writer can hold a run directory. Logs contain `Checkpoint fit`, `Resume
+fit`, and `Resume: completed candidate`. Runtime and fit counters describe the
+current invocation; they are not cumulative across restarts. Do not edit source
+files or upgrade the environment until the run finishes.
+
+Slurm sends USR1 two minutes before timeout. The runner exits with status 75 and
+keeps all committed checkpoints; even a hard kill can only discard an uncommitted
+fit. Reuse the original artifact directory rather than submitting a fresh run.
 
 ## Run
 

@@ -7,3 +7,4 @@ xgboost>=2.0
 torch>=2.0
 boto3>=1.28
 pyarrow>=12.0
+filelock>=3.12

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import logging
+import signal
+from contextlib import ExitStack
+from pathlib import Path
 from dataclasses import replace
 from time import perf_counter
 from typing import Any
@@ -10,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 import Tawan_run_stage2 as base
+from xgb_checkpoint import RunCheckpoint, run_identity, atomic_json
 
 
 def make_context(df, stations, spec, evaluation):
@@ -57,6 +61,21 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
     xcols = context['features']
     cutoff = context['fit_boundary']
     folds = base.splits.residual_oof_folds(train, cutoff)
+    checkpoint = context.get('checkpoint')
+    scope = checkpoint.scope({'evaluation': context['evaluation'], 'params': params,
+                              'budget': budget, 'patience': early_stopping_rounds,
+                              'seed': seed, 'keep_models': keep_models,
+                              'selected_rounds': selected_rounds}) if checkpoint else None
+    if scope and not keep_models:
+        cached = scope.load_summary()
+        if cached is not None:
+            return cached
+
+    def fit_unit(key, *args):
+        if scope:
+            return scope.fit(key, lambda: _fit(*args), context['device'])
+        return _fit(*args)
+
     horizons = [0] if multi else list(base.config.FORECAST_HORIZONS)
     records, importances, blocks = [], [], []
     round_counts = {}
@@ -65,7 +84,7 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
         global_key = f'global:{horizon}'
         global_budget = selected_rounds[global_key] if selected_rounds is not None else budget
         patience = None if selected_rounds is not None else early_stopping_rounds
-        global_model, used_rounds = _fit(
+        global_model, used_rounds = fit_unit(global_key,
             train, train[targets].to_numpy(), xcols, params, seed,
             global_budget, patience, multi, fit_counter)
         round_counts[global_key] = used_rounds
@@ -84,7 +103,7 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
                 if fold_key not in selected_rounds:
                     base.LOGGER.warning('%s has no saved rounds; using selected global rounds %d',
                                         fold_key, global_budget)
-            fold_model, fold_rounds = _fit(fold_train, fold_train[targets].to_numpy(), xcols,
+            fold_model, fold_rounds = fit_unit(fold_key, fold_train, fold_train[targets].to_numpy(), xcols,
                                            params, seed, fold_budget, patience, multi, fit_counter)
             round_counts[fold_key] = fold_rounds
             oof_rows.append(fold_score)
@@ -116,7 +135,7 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
                     continue
                 key = f'local:{station}:{horizon}'
                 local_budget = selected_rounds.get(key, global_budget) if selected_rounds is not None else budget
-                local_model, used_rounds = _fit(
+                local_model, used_rounds = fit_unit(key,
                     station_rows, residual_targets[station_rows.index.to_numpy()], xcols,
                     params, seed, local_budget, patience, multi, fit_counter)
                 round_counts[key] = used_rounds
@@ -134,12 +153,16 @@ def fit_evaluate(context: dict[str, Any], params: dict[str, Any], budget: int,
     if score is None or not np.isfinite(score):
         raise ValueError('No finite validation primary_macro_rmse was produced')
     by_horizon = reports['by_horizon'].set_index('horizon')['rmse'].to_dict()
-    return {'score': float(score), 'predictions': predictions, 'reports': reports,
+    result = {'score': float(score), 'predictions': predictions, 'reports': reports,
             'importance': pd.concat(importances, ignore_index=True) if importances else pd.DataFrame(),
             'model_records': records, 'selected_rounds': round_counts,
             'best_iterations': {k: v - 1 for k, v in round_counts.items()}, 'best_scores': {},
             'rmse_by_horizon': {f'rmse_t{h}': float(by_horizon[h]) for h in base.config.FORECAST_HORIZONS},
             'folds_manifest': base.splits.fold_manifest(folds)}
+    if scope and not keep_models:
+        scope.save_summary({k: result[k] for k in ('score', 'selected_rounds', 'best_iterations',
+                                                  'best_scores', 'rmse_by_horizon')})
+    return result
 
 
 def cpu_preflight(multi):
@@ -154,7 +177,17 @@ def cpu_preflight(multi):
     return {'xgboost_version': xgb.__version__, 'requested_device': 'cpu'}
 
 
+def _stop_for_resume(signum, frame):
+    base.LOGGER.warning('Received signal %s; exiting with completed checkpoints intact', signum)
+    raise SystemExit(75)
+
+
 def main(argv=None):
+    with ExitStack() as stack:
+        return _main(argv, stack)
+
+
+def _main(argv, stack):
     args = base.parse_args(argv)
     if args.experiment not in (13, 14):
         raise ValueError('This runner supports experiments 13 and 14 only')
@@ -178,7 +211,18 @@ def main(argv=None):
         raise ValueError('No eligible stations remain after selection')
     context = make_context(df, stations, spec, 'validation')
     run_id = ('DEV_' if args.development else '') + spec.run_id
-    run_dir = base._artifact_dir(run_id)
+    run_dir = args.resume.resolve() if args.resume else base._artifact_dir(run_id)
+    checkpoint = None
+    if args.checkpoint or args.resume:
+        checkpoint = stack.enter_context(RunCheckpoint(
+            run_dir, run_identity(df, stations, args, device), resume=bool(args.resume)))
+        context['checkpoint'] = checkpoint
+        for sig in (signal.SIGTERM, getattr(signal, 'SIGUSR1', signal.SIGTERM)):
+            previous = signal.signal(sig, _stop_for_resume)
+            stack.callback(signal.signal, sig, previous)
+        if (checkpoint.root / 'completed.json').exists():
+            base.LOGGER.info('Run already completed: %s', run_dir)
+            return 0
     base.LOGGER.info('Output: %s; tuning global + station residual XGBoost', run_dir)
     base.LOGGER.info('Early stopping: patience=%d, purged 85/15 training split for global/OOF/local; '
                      'test reuses each validation-selected tree count', args.early_stopping_rounds)
@@ -226,6 +270,8 @@ def main(argv=None):
                                'primary_macro_rmse': validation['score']})
     if not args.skip_test:
         test_context = make_context(df, stations, spec, 'test')
+        if checkpoint:
+            test_context['checkpoint'] = checkpoint
         test = fit_evaluate(test_context, best_params, base.MAX_BOOSTING_ROUNDS,
                             None, args.seed, {'total': 0}, True, selected_rounds=selected)
         save(test, 'test')
@@ -234,6 +280,8 @@ def main(argv=None):
                               {'total_seconds': perf_counter() - started,
                                'model_fits_during_tuning': fit_counter['total']})
     base.LOGGER.info('Completed experiment %d; artifacts: %s', args.experiment, run_dir)
+    if checkpoint:
+        atomic_json(checkpoint.root / 'completed.json', {'experiment': args.experiment, 'run_id': run_id})
     return 0
 
 

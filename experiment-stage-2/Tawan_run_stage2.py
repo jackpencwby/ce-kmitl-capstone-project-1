@@ -26,6 +26,7 @@ if str(STAGE1_DIR) not in sys.path:
     sys.path.insert(0, str(STAGE1_DIR))
 
 from common import artifacts, config, data, features, metrics, models, runner, splits  # noqa: E402
+from xgb_checkpoint import CheckpointError
 
 LOGGER = logging.getLogger("stage2")
 TARGET_COLS = [f"target_t{h}" for h in config.FORECAST_HORIZONS]
@@ -91,7 +92,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-phase3-candidates", type=int)
     parser.add_argument("--development", action="store_true", help="Use a small deterministic candidate subset.")
     parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--checkpoint", action="store_true", help="E13/14: save resumable model checkpoints.")
+    parser.add_argument("--resume", type=Path, help="E13/14: resume this existing artifact directory.")
     args = parser.parse_args(argv)
+    if (args.checkpoint or args.resume) and args.experiment not in (13, 14):
+        parser.error("--checkpoint/--resume are supported only for residual experiments 13/14")
+    if (args.checkpoint or args.resume) and not args.train:
+        parser.error("--checkpoint/--resume require --train")
     if args.device is not None and args.experiment not in (13, 14):
         parser.error("--device is supported only for residual experiments 13/14")
     if args.early_stopping_rounds < 1:
@@ -511,6 +518,8 @@ def _run_round(phase: int, round_id: int, candidates: list[dict[str, Any]], budg
                 **result["rmse_by_horizon"], "status": "ok",
             })
             results.append((result["score"], _candidate_key(params), params))
+        except CheckpointError:
+            raise  # A checkpoint failure must never change the candidate ranking.
         except Exception as exc:  # keep candidate-level failures auditable
             row.update(status="failed", failure_reason=f"{type(exc).__name__}: {exc}")
             LOGGER.exception("%s candidate %s failed", trial_id, _candidate_key(params))
