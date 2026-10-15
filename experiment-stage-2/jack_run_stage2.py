@@ -627,10 +627,12 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
         used_rounds = {}
 
         def residual_fit(X, y, dates, key):
+            _check_stop()
             train = lambda: _fit_residual_lgbm(params, X, y, dates, key, early_stopping_rounds,
                                                fit_rounds, used_rounds)
             estimator, rounds = scope.fit(key, train, params['device_type']) if scope else train()
             used_rounds[key] = rounds
+            _check_stop()
             return estimator, rounds
 
         def direct_fit(factory, prefer_gpu, X_tr, y_tr, X_val, y_val=None,
@@ -782,6 +784,7 @@ def _run_round(phase: int, round_id: int, candidates: list[dict[str, Any]], budg
     scored: list[tuple[float, str, dict[str, Any]]] = []
     started_phase = perf_counter()
     for index, params in enumerate(candidates, start=1):
+        _check_stop()
         started = perf_counter()
         trial_id = f"P{phase}R{round_id}T{index:04d}"
         row: dict[str, Any] = {
@@ -916,14 +919,29 @@ def _write_phase_csv(run_dir: Path, trial_rows: list[dict[str, Any]], phase: int
         run_dir / f"phase{phase}_results.csv", index=False)
 
 
+_STOP_REQUESTED = False
+
+
 def _stop_for_resume(signum, frame):
-    LOGGER.warning('Received signal %s; completed checkpoints are preserved', signum)
-    raise SystemExit(75)
+    # Never unwind through LightGBM's native/OpenCL training call.
+    global _STOP_REQUESTED
+    _STOP_REQUESTED = True
+    LOGGER.warning('Received signal %s; stopping after the current fit is committed', signum)
+
+
+def _check_stop():
+    if _STOP_REQUESTED:
+        raise SystemExit(75)
 
 
 def main(argv: list[str] | None = None) -> int:
-    with ExitStack() as stack:
-        return _main(argv, stack)
+    global _STOP_REQUESTED
+    _STOP_REQUESTED = False
+    try:
+        with ExitStack() as stack:
+            return _main(argv, stack)
+    finally:
+        _STOP_REQUESTED = False
 
 
 def _main(argv, stack) -> int:

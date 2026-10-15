@@ -13,9 +13,10 @@ sbatch --job-name=Japan_E2_15 experiment-stage-2/Japan_LGBM_train.sh \
 ```
 
 The launcher requests one 23 GB MIG GPU, four CPUs and 32 GB RAM for up to 24 hours.
-Two minutes before expiry it forwards USR1 to Python. Python exits with code 75,
-releases its checkpoint lock, and the launcher queues the same experiment with
-the same run directory. At most ten allocations are submitted per experiment.
+Two minutes before expiry it queues a continuation with an `afterany` dependency
+and forwards USR1 to Python. Python finishes and commits its current native fit
+before exiting with code 75. If that fit outlasts the warning period, the queued
+job repeats the incomplete fit. At most ten allocations are submitted per experiment.
 Other errors stop the chain. Successful E15 completion queues E16 using an
 `afterok` dependency on the finishing E15 allocation. E16 is not submitted until
 E15's final export marker exists. Closing Jupyter does not cancel these jobs.
@@ -23,8 +24,8 @@ E15's final export marker exists. Closing Jupyter does not cancel these jobs.
 If submission fails or the continuation limit is reached, inspect the log and
 submit the same command with the same directories. The launcher automatically
 uses `--resume` when a manifest exists. Do not submit duplicate chains. Cancellation
-of the pending/running chain should use normal Slurm cancellation (not USR1, which
-explicitly requests continuation).
+of the chain must include both running and pending jobs, e.g. `scancel --user="$USER"
+--name=Japan_E2_15,Japan_E2_16` (not USR1, which explicitly requests continuation).
 
 For Python directly:
 

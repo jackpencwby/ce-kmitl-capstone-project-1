@@ -22,7 +22,7 @@ class ChainTests(unittest.TestCase):
             python.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ROOT/python-args"\nexit '+str(status)+'\n')
             python.chmod(0o755)
             sbatch = root / 'sbatch'
-            sbatch.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ROOT/submitted"\necho "Submitted batch job 900"\n')
+            sbatch.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ROOT/submitted"\necho 900\n')
             sbatch.chmod(0o755)
             env = dict(os.environ, TEST_ROOT=str(root), JAPAN_REPO_ROOT=str(root),
                        JAPAN_PYTHON=str(python), SLURM_JOB_ID='123', SLURM_CPUS_PER_TASK='4',
@@ -69,7 +69,7 @@ class ChainTests(unittest.TestCase):
                 python.write_text('#!/bin/bash\ntrap "exit 75" USR1 TERM\ntouch "$TEST_ROOT/ready"\nwhile :; do sleep 0.05; done\n')
                 python.chmod(0o755)
                 sbatch = root/'sbatch'
-                sbatch.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ROOT/submitted"\n')
+                sbatch.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$TEST_ROOT/submitted"\necho 900\n')
                 sbatch.chmod(0o755)
                 env = dict(os.environ, TEST_ROOT=str(root), JAPAN_REPO_ROOT=str(root),
                            JAPAN_PYTHON=str(python), SLURM_JOB_ID='123',

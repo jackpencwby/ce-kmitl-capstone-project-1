@@ -13,6 +13,15 @@ import jack_run_stage2 as runner
 
 
 class ResumeTests(unittest.TestCase):
+    def test_stop_signal_is_deferred_until_safe_checkpoint_boundary(self):
+        try:
+            runner._stop_for_resume(10, None)  # Must return normally, even inside a native fit.
+            with self.assertRaises(SystemExit) as stopped:
+                runner._check_stop()
+            self.assertEqual(stopped.exception.code, 75)
+        finally:
+            runner._STOP_REQUESTED = False
+
     def checkpoint_class(self):
         self.assertTrue(hasattr(runner, 'LGBMCheckpoint'), 'LightGBM checkpoint support is missing')
         return runner.LGBMCheckpoint

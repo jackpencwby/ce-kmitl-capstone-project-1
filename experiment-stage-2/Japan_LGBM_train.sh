@@ -33,7 +33,23 @@ echo "Experiment=$EXPERIMENT Job=${SLURM_JOB_ID:-manual} Attempt=$ATTEMPT Run=$R
 child=''
 interrupted=0
 cancelled=0
-trap 'interrupted=1; if [[ -n "$child" ]]; then kill -USR1 "$child" 2>/dev/null || true; fi' USR1
+continuation=''
+queue_resume() {
+    [[ -n "$continuation" ]] && return 0
+    if [[ "$ATTEMPT" -ge 9 || ! -f "$RUN_DIR/checkpoint/manifest.json" ]]; then return 1; fi
+    continuation=$(sbatch --parsable --dependency="afterany:${SLURM_JOB_ID:?}" --job-name="Japan_E2_$EXPERIMENT" \
+        "$SCRIPT" "$EXPERIMENT" "$RUN_DIR" "$NEXT_DIR" "$((ATTEMPT + 1))") || return 1
+    continuation=${continuation%%;*}
+    [[ "$continuation" =~ ^[0-9]+$ ]] || return 1
+    echo "Queued continuation job $continuation from the same checkpoint."
+}
+request_resume() {
+    interrupted=1
+    # Queue before waiting for a native fit: it may outlast the warning period.
+    queue_resume || echo 'Could not queue continuation; manual resume may be required.' >&2
+    if [[ -n "$child" ]]; then kill -USR1 "$child" 2>/dev/null || true; fi
+}
+trap request_resume USR1
 trap 'cancelled=1; interrupted=1; if [[ -n "$child" ]]; then kill -TERM "$child" 2>/dev/null || true; fi' TERM
 "$PYTHON" -u experiment-stage-2/jack_run_stage2.py "${ARGS[@]}" &
 child=$!
@@ -50,16 +66,19 @@ set -e
 trap - USR1 TERM
 if [[ "$cancelled" == 1 ]]; then exit 143; fi
 if [[ "$status" == 75 ]]; then
-    if [[ "$ATTEMPT" -ge 9 || ! -f "$RUN_DIR/checkpoint/manifest.json" ]]; then
+    if ! queue_resume; then
         echo 'Continuation stopped: retry limit reached or no checkpoint manifest.' >&2
         exit 75
     fi
-    sbatch --dependency="afterany:${SLURM_JOB_ID:?}" --job-name="Japan_E2_$EXPERIMENT" \
-        "$SCRIPT" "$EXPERIMENT" "$RUN_DIR" "$NEXT_DIR" "$((ATTEMPT + 1))"
-    echo 'Queued continuation from the same checkpoint.'
     exit 0
 fi
-if [[ "$status" != 0 ]]; then exit "$status"; fi
+if [[ "$status" != 0 ]]; then
+    if [[ -n "$continuation" && "$status" != 137 && "$status" != 143 ]]; then scancel "$continuation"; fi
+    exit "$status"
+fi
+# If the warning arrived during final exports, the queued invocation validates
+# the completed run and schedules E16. Do not submit E16 twice.
+if [[ -n "$continuation" ]]; then exit 0; fi
 if [[ ! -f "$RUN_DIR/checkpoint/completed.json" ]]; then
     echo 'Python exited without a completed export marker; not scheduling the next experiment.' >&2
     exit 1
