@@ -34,8 +34,10 @@ import json
 import logging
 import math
 import random
+import signal
 import sys
 import warnings
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from functools import partial
@@ -56,6 +58,8 @@ if str(STAGE1_DIR) not in sys.path:
     sys.path.insert(0, str(STAGE1_DIR))
 
 from common import artifacts, config, data, metrics, models, runner, splits  # noqa: E402
+from lgbm_checkpoint import LGBMCheckpoint, lightgbm_identity, complete_run, completed_run
+from xgb_checkpoint import CheckpointError, atomic_json
 
 
 LOGGER = logging.getLogger(__name__)
@@ -150,7 +154,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--skip-test", action="store_true",
                         help="Tune on validation and save the winner without touching the test split.")
     parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--checkpoint", action="store_true", help="E15/16: save completed fits for resume.")
+    parser.add_argument("--resume", type=Path, help="E15/16: resume an existing artifact directory.")
+    parser.add_argument("--run-dir", type=Path, help="E15/16 checkpoint output directory (for Slurm continuation).")
     args = parser.parse_args(argv)
+    if args.checkpoint or args.resume or args.run_dir:
+        if args.experiment not in (15, 16) or not args.train:
+            parser.error("Checkpoint options require --experiment 15/16 and --train")
+        if args.run_dir and not (args.checkpoint or args.resume):
+            parser.error("--run-dir requires --checkpoint or --resume")
+        if args.run_dir and args.resume and args.run_dir.resolve() != args.resume.resolve():
+            parser.error("--run-dir and --resume must refer to the same directory")
     if args.gpu_platform_id < -1 or args.gpu_device_id < -1:
         parser.error("GPU platform/device IDs must be -1 or non-negative")
     if args.early_stopping_rounds < 1:
@@ -573,7 +587,8 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
                params: dict[str, Any], evaluation: str,
                budget: int = MAX_BOOSTING_ROUNDS,
                early_stopping_rounds: int | None = None,
-               fit_rounds: dict[str, int] | None = None) -> dict[str, Any]:
+               fit_rounds: dict[str, int] | None = None,
+               checkpoint=None, cache_summary=False) -> dict[str, Any]:
     """Train pooled LightGBM models for one split using a supplied trial config.
 
     ``budget`` is the maximum number of trees.  With ``early_stopping_rounds``
@@ -589,6 +604,16 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
     params = {**params, "n_estimators": int(budget),
               **_device_params("gpu" if spec.prefer_gpu else "cpu",
                                getattr(spec, "gpu_platform_id", -1), getattr(spec, "gpu_device_id", -1))}
+    scope = checkpoint.scope({'evaluation': evaluation, 'params': params,
+                              'patience': early_stopping_rounds, 'fit_rounds': fit_rounds,
+                              'cache_summary': cache_summary}) if checkpoint else None
+    if scope and cache_summary:
+        cached = scope.load_summary()
+        if cached is not None:
+            return {'reports': {'overall': {'macro': {'primary_macro_rmse': cached['score']}},
+                                'by_horizon': pd.DataFrame([
+                                    {'horizon': int(h), 'rmse': v} for h, v in cached['rmse_by_horizon'].items()])},
+                    'fit_rounds': cached['selected_rounds'], 'model_records': []}
     masks = _evaluation_masks(frame, evaluation)
     eval_spec = replace(
         spec,
@@ -602,8 +627,11 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
         used_rounds = {}
 
         def residual_fit(X, y, dates, key):
-            return _fit_residual_lgbm(params, X, y, dates, key, early_stopping_rounds,
-                                      fit_rounds, used_rounds)
+            train = lambda: _fit_residual_lgbm(params, X, y, dates, key, early_stopping_rounds,
+                                               fit_rounds, used_rounds)
+            estimator, rounds = scope.fit(key, train, params['device_type']) if scope else train()
+            used_rounds[key] = rounds
+            return estimator, rounds
 
         def direct_fit(factory, prefer_gpu, X_tr, y_tr, X_val, y_val=None,
                        train_dates=None, horizon=0, group="global"):
@@ -616,6 +644,11 @@ def run_pooled(spec: models.RunSpec, df: pd.DataFrame, stations: list,
             result = models._run_residual(eval_spec, frame, factory, base_columns, masks,
                                           fit_predict=direct_fit)
         result["fit_rounds"] = used_rounds
+        if scope and cache_summary:
+            per_horizon = result['reports']['by_horizon'].set_index('horizon')['rmse'].to_dict()
+            scope.save_summary({'score': primary_score(result), 'selected_rounds': used_rounds,
+                                'best_iterations': used_rounds, 'best_scores': {},
+                                'rmse_by_horizon': {str(h): float(v) for h, v in per_horizon.items()}})
         return result
 
     frame, feature_columns = models._add_categorical_codes(frame, eval_spec, base_columns, masks["train"])
@@ -761,7 +794,8 @@ def _run_round(phase: int, round_id: int, candidates: list[dict[str, Any]], budg
         }
         try:
             result = run_pooled(spec, df, stations, params, "validation", budget=budget,
-                                early_stopping_rounds=args.early_stopping_rounds)
+                                early_stopping_rounds=args.early_stopping_rounds,
+                                checkpoint=getattr(args, '_checkpoint', None), cache_summary=True)
             score = primary_score(result)
             by_horizon = result["reports"]["by_horizon"]
             per_horizon = by_horizon.set_index("horizon")["rmse"].to_dict() if len(by_horizon) else {}
@@ -774,6 +808,8 @@ def _run_round(phase: int, round_id: int, candidates: list[dict[str, Any]], budg
             counters["models"] += len(result["model_records"])
             scored.append((score, row["parameters"], params))
             LOGGER.info("%s RMSE %.6f (budget %d)", trial_id, score, budget)
+        except CheckpointError:
+            raise
         except Exception as error:  # noqa: BLE001 - keep candidate-level failures auditable
             row.update(status="failed", failure_reason=f"{type(error).__name__}: {error}")
             LOGGER.exception("%s candidate %s failed", trial_id, row["parameters"])
@@ -880,7 +916,17 @@ def _write_phase_csv(run_dir: Path, trial_rows: list[dict[str, Any]], phase: int
         run_dir / f"phase{phase}_results.csv", index=False)
 
 
+def _stop_for_resume(signum, frame):
+    LOGGER.warning('Received signal %s; completed checkpoints are preserved', signum)
+    raise SystemExit(75)
+
+
 def main(argv: list[str] | None = None) -> int:
+    with ExitStack() as stack:
+        return _main(argv, stack)
+
+
+def _main(argv, stack) -> int:
     run_started = perf_counter()
     args = parse_args(argv)
     logging.basicConfig(
@@ -908,7 +954,18 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("No eligible stations remain after selection")
 
     run_id = f"DEV_{spec.run_id}" if args.development else spec.run_id
-    run_dir = artifact_directory(run_id)
+    run_dir = (args.resume or args.run_dir).resolve() if (args.resume or args.run_dir) else artifact_directory(run_id)
+    checkpoint = None
+    if args.checkpoint or args.resume:
+        checkpoint = stack.enter_context(LGBMCheckpoint(run_dir, lightgbm_identity(df, stations, args),
+                                                       resume=bool(args.resume)))
+        args._checkpoint = checkpoint
+        for sig in (signal.SIGTERM, getattr(signal, 'SIGUSR1', signal.SIGTERM)):
+            previous = signal.signal(sig, _stop_for_resume)
+            stack.callback(signal.signal, sig, previous)
+        if completed_run(checkpoint, args.experiment, args.skip_test):
+            LOGGER.info('Run already completed: %s', run_dir)
+            return 0
     LOGGER.info("Stage 2 experiment %d: %s; stations=%d; output=%s%s",
                 args.experiment, EXPERIMENTS[args.experiment]["label"], len(stations), run_dir,
                 " [development run]" if args.development else "")
@@ -923,7 +980,7 @@ def main(argv: list[str] | None = None) -> int:
     # to recover the early-stopped tree counts used by the train+validation refit.
     # Test is not involved in tuning.
     validation_result = run_pooled(spec, df, stations, best_params, "validation", budget=final_budget,
-                                   early_stopping_rounds=args.early_stopping_rounds)
+                                   early_stopping_rounds=args.early_stopping_rounds, checkpoint=checkpoint)
     selected_rounds = validation_result["fit_rounds"]
     validation_rows = df[df[config.STATION_ID_COL].isin(stations) & splits.date_masks(df)["validation"]]
     validation_pair = write_persistence_comparison(
@@ -997,11 +1054,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.skip_test:
         LOGGER.info("Validation winner saved. Test was skipped by request.")
+        if checkpoint:
+            complete_run(checkpoint, args.experiment, True)
         return 0
 
     test_started = perf_counter()
     test_result = run_pooled(spec, df, stations, best_params, "test", budget=final_budget,
-                             fit_rounds=selected_rounds or None)
+                             fit_rounds=selected_rounds or None, checkpoint=checkpoint)
     test_rows = df[df[config.STATION_ID_COL].isin(stations) & splits.date_masks(df)["test"]]
     test_pair = write_persistence_comparison(run_dir, "test", test_result["predictions"], test_rows)
     run_config.update({
@@ -1014,6 +1073,8 @@ def main(argv: list[str] | None = None) -> int:
     save_split(run_dir, spec, df, stations, test_result, run_config, "test")
     LOGGER.info("Complete. Validation RMSE=%.6f; test RMSE=%s",
                 best_score, test_pair["model"]["overall"]["macro"].get("primary_macro_rmse"))
+    if checkpoint:
+        complete_run(checkpoint, args.experiment, False)
     return 0
 
 
