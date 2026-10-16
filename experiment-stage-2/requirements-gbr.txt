@@ -1,0 +1,7 @@
+numpy==2.2.6
+pandas==2.2.3
+scikit-learn==1.7.0
+scipy==1.13.0
+joblib==1.5.1
+pyarrow==21.0.0
+filelock==3.30.2

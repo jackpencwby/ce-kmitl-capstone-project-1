@@ -6,6 +6,9 @@ import argparse
 import json
 import logging
 import random
+import signal
+from contextlib import ExitStack
+from gbr_checkpoint import Checkpoint, CheckpointError, run_identity
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +47,9 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--experiment", required=True, choices=sorted(EXPERIMENTS), type=int)
     p.add_argument("--train", action="store_true")
+    p.add_argument("--checkpoint", action="store_true")
+    p.add_argument("--resume", type=Path)
+    p.add_argument("--run-dir", type=Path)
     p.add_argument("--source", choices=("auto", "local", "gcs"), default="auto")
     p.add_argument("--seed", type=int, default=config.SEED)
     p.add_argument("--stations", nargs="+", default=["all"])
@@ -63,6 +69,8 @@ def parse_args(argv=None):
                  "max_phase2_candidates", "max_phase3_candidates"):
         v = getattr(a, name)
         if v is not None and v < 1: p.error(f"--{name.replace('_','-')} must be positive")
+    if a.run_dir and not (a.checkpoint or a.resume): p.error("--run-dir requires --checkpoint or --resume")
+    if a.resume and a.run_dir and a.resume.resolve()!=a.run_dir.resolve(): p.error("--run-dir and --resume must match")
     if a.development:
         a.max_phase1_candidates = min(a.max_phase1_candidates or 3, 3)
         a.max_phase2_candidates = min(a.max_phase2_candidates or 3, 3)
@@ -128,6 +136,26 @@ def _model(params, joint, seed, n_estimators):
     return (JointMultiOutputGradientBoostingRegressor(**p) if joint
             else GradientBoostingRegressor(loss="squared_error", **p))
 
+_STOP_REQUESTED = False
+
+def _request_stop(signum, frame):
+    global _STOP_REQUESTED
+    _STOP_REQUESTED = True
+    LOG.warning("Stop requested; finishing and committing current fit")
+
+def _check_stop():
+    if _STOP_REQUESTED: raise SystemExit(75)
+
+def _fit_model(model, X, y, checkpoint=None):
+    _check_stop()
+    if checkpoint is None:
+        fitted = model.fit(X, y)
+    else:
+        key = {'class':type(model).__name__, 'params':model.get_params(), 'data':joblib.hash((X,y))}
+        fitted = checkpoint.fit(key, lambda: model.fit(X,y))
+    _check_stop()
+    return fitted
+
 def _stage_predictions(context, params, joint, seed, budget, evaluation="validation", patience=100):
     """Fit group systems once and select the best common boosting stage on validation."""
     start = pd.Timestamp(config.VALIDATION_START)
@@ -151,7 +179,7 @@ def _stage_predictions(context, params, joint, seed, budget, evaluation="validat
         if not np.isfinite(Xtr).all() or not np.isfinite(Xva).all():
             raise ValueError("Stage 1 GBR preprocessing left non-finite feature values")
         if joint:
-            est = _model(params, True, seed, budget).fit(Xtr, tr[TARGET_COLS].to_numpy(float))
+            est = _fit_model(_model(params, True, seed, budget), Xtr, tr[TARGET_COLS].to_numpy(float), context.get("checkpoint"))
             iterator = est.staged_predict(Xva)
             targets = [0]
         else:
@@ -163,7 +191,7 @@ def _stage_predictions(context, params, joint, seed, budget, evaluation="validat
                 # Refit imputer on each horizon's actual training rows only.
                 hi = SimpleImputer(strategy="constant", fill_value=-999.0, keep_empty_features=True)
                 hx = hi.fit_transform(htr[cols]); hv = hi.transform(va[cols])
-                e = _model(params, False, seed + h, budget).fit(hx, htr[f"target_t{h}"].to_numpy(float))
+                e = _fit_model(_model(params, False, seed + h, budget), hx, htr[f"target_t{h}"].to_numpy(float), context.get("checkpoint"))
                 ests.append((e, hi, hv)); iterators.append(e.staged_predict(hv))
             def direct_stages():
                 for stage_values in zip(*iterators): yield np.column_stack(stage_values)
@@ -219,8 +247,19 @@ def hierarchical_search(context, args, run_dir, exp, joint, finetune=False):
         nonlocal fits, trees, trial
         scored=[]; tick=perf_counter()
         for params in candidates:
+            _check_stop()
             trial += 1; t=perf_counter(); row={"phase":phase,"round":round_no,"trial_id":trial,
                 "experiment_id":exp,"parameters":json.dumps(params, sort_keys=True),"budget":budget}
+            checkpoint=context.get("checkpoint")
+            trial_key={"phase":phase,"round":round_no,"params":params,"budget":budget}
+            cached=checkpoint.load_trial(trial_key) if checkpoint else None
+            if cached is not None:
+                rows.append(cached)
+                scored.append((cached["validation_primary_macro_rmse"],params))
+                fits += cached["model_fits"]; trees += cached["weak_trees"]
+                LOG.info("Resume completed trial %s", trial)
+                continue
+            fits_before,trees_before=fits,trees
             try:
                 score, it, prediction, fitted, importance = _stage_predictions(
                     context, params, joint, args.seed, budget, patience=args.stage_patience)
@@ -243,10 +282,18 @@ def hierarchical_search(context, args, run_dir, exp, joint, finetune=False):
                     trees += sum(len(rec["estimator"]["model"].estimators_) for rec in composed["records"])
                     trees += composed.get("residual_oof_weak_trees_fit",0)
                 scored.append((score,params))
+            except CheckpointError:
+                raise
             except Exception as exc:
                 row.update(best_iteration=None,validation_primary_macro_rmse=np.nan,status="failed",failure_reason=f"{type(exc).__name__}: {exc}")
                 LOG.exception("Trial %s failed",trial)
-            row["elapsed_seconds"]=perf_counter()-t; rows.append(row)
+            row["elapsed_seconds"]=perf_counter()-t
+            row["model_fits"]=fits-fits_before; row["weak_trees"]=trees-trees_before
+            if checkpoint and row["status"]=="ok":
+                checkpoint.save_trial(trial_key,row)
+                checkpoint.prune_models()
+            rows.append(row)
+            LOG.info("Trial %s phase=%s budget=%s status=%s score=%s",trial,phase,budget,row["status"],row["validation_primary_macro_rmse"])
         phase_times[phase]=phase_times.get(phase,0)+perf_counter()-tick
         pd.DataFrame(rows).to_csv(run_dir/"tuning_trials.csv",index=False)
         # Python's stable sort preserves the seeded candidate order for ties.
@@ -341,7 +388,7 @@ def _apply_local_residual_tuning(result, context, params, joint, seed, n_estimat
             if tr.empty or va.empty: continue
             imp=SimpleImputer(strategy="constant",fill_value=-999.0,keep_empty_features=True)
             Xtr=imp.fit_transform(tr[cols]); Xva=imp.transform(va[cols])
-            model=_model(params,True,seed,n_estimators).fit(Xtr,tr[TARGET_COLS].to_numpy(float))
+            model=_fit_model(_model(params,True,seed,n_estimators),Xtr,tr[TARGET_COLS].to_numpy(float),context.get("checkpoint"))
             oof_model_fits+=1; oof_trees+=len(model.estimators_)
             residual=va[TARGET_COLS].to_numpy(float)-model.predict(Xva)
             block=va[[config.STATION_ID_COL,config.DATE_COL]].copy()
@@ -356,7 +403,7 @@ def _apply_local_residual_tuning(result, context, params, joint, seed, n_estimat
                 if trh.empty or vah.empty: continue
                 imp=SimpleImputer(strategy="constant",fill_value=-999.0,keep_empty_features=True)
                 Xtr=imp.fit_transform(trh[cols]); Xva=imp.transform(vah[cols])
-                model=_model(params,False,seed+h,n_estimators).fit(Xtr,trh[f"target_t{h}"].to_numpy(float))
+                model=_fit_model(_model(params,False,seed+h,n_estimators),Xtr,trh[f"target_t{h}"].to_numpy(float),context.get("checkpoint"))
                 oof_model_fits+=1; oof_trees+=len(model.estimators_)
                 block=vah[[config.STATION_ID_COL,config.DATE_COL]].copy()
                 block[f"residual_t{h}"]=vah[f"target_t{h}"].to_numpy(float)-model.predict(Xva)
@@ -379,7 +426,7 @@ def _apply_local_residual_tuning(result, context, params, joint, seed, n_estimat
             imp=SimpleImputer(strategy="constant",fill_value=-999.0,keep_empty_features=True)
             Xtr=imp.fit_transform(station_oof[cols]); Xev=imp.transform(station_eval[cols])
             local=_model(params,True,seed+int(sid) if str(sid).isdigit() else seed,n_estimators)
-            local.fit(Xtr,station_oof[[f"residual_t{h}" for h in config.FORECAST_HORIZONS]].to_numpy(float))
+            local=_fit_model(local,Xtr,station_oof[[f"residual_t{h}" for h in config.FORECAST_HORIZONS]].to_numpy(float),context.get("checkpoint"))
             correction=local.predict(Xev)
             for j,h in enumerate(config.FORECAST_HORIZONS):
                 mask=prediction[config.STATION_ID_COL].eq(sid)&prediction["horizon"].eq(h)
@@ -397,7 +444,7 @@ def _apply_local_residual_tuning(result, context, params, joint, seed, n_estimat
                 if len(source)<config.MLP_PARAMS.min_station_rows: continue
                 imp=SimpleImputer(strategy="constant",fill_value=-999.0,keep_empty_features=True)
                 Xtr=imp.fit_transform(source[cols]); Xev=imp.transform(station_eval[cols])
-                local=_model(params,False,seed+h,n_estimators).fit(Xtr,source[residual_col].to_numpy(float))
+                local=_fit_model(_model(params,False,seed+h,n_estimators),Xtr,source[residual_col].to_numpy(float),context.get("checkpoint"))
                 correction=local.predict(Xev)
                 correction_map=dict(zip(station_eval[config.DATE_COL],correction))
                 mask=prediction[config.STATION_ID_COL].eq(sid)&prediction["horizon"].eq(h)
@@ -412,6 +459,13 @@ def _apply_local_residual_tuning(result, context, params, joint, seed, n_estimat
     return result
 
 def main(argv=None):
+    global _STOP_REQUESTED
+    _STOP_REQUESTED=False
+    try:
+        with ExitStack() as stack: return _main(argv,stack)
+    finally: _STOP_REQUESTED=False
+
+def _main(argv,stack):
     run_started=perf_counter()
     args=parse_args(argv)
     logging.basicConfig(level=getattr(logging,args.log_level.upper(),logging.INFO),format="%(asctime)s %(levelname)s %(message)s")
@@ -428,10 +482,18 @@ def main(argv=None):
     if args.max_stations: stations=stations[:args.max_stations]
     runid=spec.run_id+("__DEV" if args.development else "")
     run_dir=Path(__file__).resolve().parent/"artifacts"/f"{runid}__{datetime.now(timezone.utc):%Y%m%d_%H%M%S}"
-    run_dir.mkdir(parents=True,exist_ok=False)
+    run_dir=args.resume or args.run_dir or run_dir
+    checkpoint=None
+    if args.checkpoint or args.resume:
+        checkpoint=stack.enter_context(Checkpoint(run_dir,run_identity(df,args,stations,ROOT),resume=bool(args.resume)))
+        for signum in (signal.SIGTERM, getattr(signal,"SIGUSR1",signal.SIGTERM)):
+            old=signal.signal(signum,_request_stop); stack.callback(signal.signal,signum,old)
+        if checkpoint.completed():
+            LOG.info("Already completed: %s",run_dir); return 0
+    else: run_dir.mkdir(parents=True,exist_ok=False)
     # Keep held-out test rows and labels out of the tuning/refit object graph.
     validation_df=df[df[config.DATE_COL] < pd.Timestamp(config.TEST_START)].copy()
-    context=build_context(spec,validation_df,stations); context["evaluation"]="validation"
+    context=build_context(spec,validation_df,stations); context["evaluation"]="validation"; context["checkpoint"]=checkpoint
     masks=context["masks"]
     print(f"Dataset rows={len(df)} stations={len(stations)} features={len(context['columns'])} targets={len(TARGET_COLS)}")
     split_counts=splits.date_masks(df)
@@ -460,10 +522,11 @@ def main(argv=None):
             "test_prediction_seconds":0,"total_run_seconds":perf_counter()-run_started,
             "total_model_fits_during_tuning":result["summary"]["total_model_fits"],
             "total_weak_trees_fit_during_tuning":result["summary"]["total_weak_trees_fit"]})
+        if checkpoint: checkpoint.complete()
         return 0
     test_started=perf_counter()
     test_spec=spec
-    test_context=build_context(test_spec,df,stations); test_context["evaluation"]="test"
+    test_context=build_context(test_spec,df,stations); test_context["evaluation"]="test"; test_context["checkpoint"]=checkpoint
     test=_fit_final(test_context,result["params"],joint,args.seed,result["best_iteration"],"test")
     if finetune:
         test=_apply_local_residual_tuning(test,test_context,result["params"],joint,args.seed,result["best_iteration"],"test")
@@ -474,6 +537,7 @@ def main(argv=None):
         "test_prediction_seconds":perf_counter()-test_started,"total_run_seconds":perf_counter()-run_started,
         "total_model_fits_during_tuning":result["summary"]["total_model_fits"],
         "total_weak_trees_fit_during_tuning":result["summary"]["total_weak_trees_fit"]})
+    if checkpoint: checkpoint.complete()
     return 0
 
 if __name__=="__main__":
